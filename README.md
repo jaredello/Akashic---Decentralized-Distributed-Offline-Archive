@@ -1,0 +1,2 @@
+# Akashic---Decentralized-Distributed-Offline-Archive
+The concept of the akashic records brought to life. A disruption to the concept of secrets. Sensitive information can be taken off-cloud and stored at home. Connects with internet archive and Wikipedia to decentralize and preserve information. We lost our knowledge once when Alexandria burned, now the library can be in a million places at once.
