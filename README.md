@@ -1,5 +1,5 @@
 # Akashic---Decentralized-Distributed-Offline-Archive
-Akashic is an open source system.
+Akashic is an open source system. -
 Build 1.0 Goal: seemlessly read data from 2 or more sources at once -
 
 1.0 Use case demonstration-
