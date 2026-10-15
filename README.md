@@ -1,5 +1,8 @@
 # Akashic---Decentralized-Distributed-Offline-Archive
-Akashic is an open source system. Offline internet equivalent to a 85mbps connection.
+Akashic is an open source system.
+Build 1.0 Goal: seemlessly read data from 2 or more sources at once
+1.0 Use case demonstration: Wikipedia can fit across 2 disks. Text on one, media on the other. 
+Read these disks at the same time, and combine the data being read so that one can browse just like it was a webpage, or use an LLM to "chat"
 
 The concept of the Akashic Records brought to life. 
 A disruption to data centers.
