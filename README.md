@@ -6,6 +6,14 @@ Build 1.0 Goal: seemlessly read data from 2 or more sources at once -
 Wikipedia can fit across 2 disks. Text on one, media on the other. 
 Read these disks at the same time, and combine the data being read so that one can browse just like it was a webpage, or use an LLM to "chat"
 
+Impact Goals:
+Reduce data center resource consumption by at least 12%. 
+A minimum of 12% of a data center's resources goes to safety guardrails - if people train models based on their own data, there is no need for guardrails since they have context for the information they recieve. 
+-
+Humans are asking the wrong questions to the wrong datasets, so its no wonder people are getting the wrong answers. If the individual trains their own model, they can verify and access the information that they actually need. Like an offline google search that only contains relevant data. If the individual trains their own model, the individual maintains context about WHY the model may be giving the answers it is giving, illuminating the black box. 
+For example, if you ask your grandparents a question about how the world works, its not surprising that they may give you "outdated" answers. Their neurons were formed on "outdated" information. One can then solve for X, get to know the source a bit more, and one can learn WHY they think what they think.
+
+
 Logos, Pathos and Ethos : -
 The concept of the Akashic Records brought to life. 
 A disruption to data centers.
@@ -13,8 +21,7 @@ A disruption to the concept of secrets.
 Autosave for civilization.
 Store information locally and securely offline. Connects with Wikipedia, and the OSE "facts" device to decentralize and preserve humanity's information. We lost our knowledge once when Alexandria burned, now the library can be in a million places at once.
 
-Humans are asking the wrong questions to the wrong datasets, so its no wonder people are getting the wrong answers. If the individual trains their own model, they can verify and access the information that they actually need. Like an offline google search that only contains relevant data. If the individual trains their own model, the individual maintains context about WHY the model may be giving the answers it is giving, illuminating the black box. 
-For example, if you ask your grandparents a question about how the world works, its not surprising that they may give you "outdated" answers. Their neurons were formed on "outdated" information. One can then solve for X, get to know the source a bit more, and one can learn WHY they think what they think.
+
 
 This project seeks to answer the age old question, "who's they?" 
 As behemoth corporate LLMS grow larger, a data verification problem emerges, these models are increasingly training themselves upon their own data, becoming sycophantic goal seekers, skirting the task at hand and telling us humans what we want to hear. Working smarter, not harder, its only natural, but these goals don't necessarily line up with our own.  think Ex Machina, or a wish to a genie gone awry. 
