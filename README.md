@@ -42,5 +42,4 @@ To answer the age old question of "who's they?"
 What do "they" say about what's healthy to eat?
 What do "they" say about the best way to work out for my body type?
 
-An end to AI psychosis. Humans are asking the wrong questions to the wrong datasets, so its no wonder people are getting the wrong answers. If the individual trains their own model, they can verify and access the information that they actually need. Like an  offline google search that only contains relevant data. If the individual trains their own model, the individual maintains context about why the model may be giving the answers it is giving, illuminating the black box. 
-For example, if you ask your grandparents a question about how the world works, its not surprising that they may give you "outdated" answers. Their neurons were formed on "outdated" information. One can then solve for X, get to know the source a bit more, and one can learn WHY they think what they think.
+An end to AI psychosis. 
