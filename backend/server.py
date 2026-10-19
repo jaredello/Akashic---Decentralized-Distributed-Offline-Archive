@@ -1,15 +1,19 @@
 import os
 import re
+import io
 import time
+import json
 import uuid
 import html
 import asyncio
 import logging
+from collections import Counter
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
 
 import requests
+import pycdlib
 from bs4 import BeautifulSoup, NavigableString
 from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.responses import Response
@@ -102,7 +106,9 @@ CURATED_TITLES = [
     "Great Pyramid of Giza", "Coffee", "Jupiter", "DNA", "Lion", "Internet",
 ]
 
-seed_state = {"state": "idle", "done": 0, "total": len(CURATED_TITLES), "current": "", "errors": []}
+seed_state = {"state": "idle", "phase": "", "done": 0, "total": len(CURATED_TITLES), "current": "", "errors": []}
+burn_state = {"state": "idle", "step": "", "progress": 0, "total": 0, "error": ""}
+EXPORT_DIR = Path("/tmp/offline_wiki_exports")
 
 
 def slugify_title(title: str) -> str:
@@ -314,52 +320,377 @@ async def _seed_one(title: str) -> dict:
         ref = await _store_media(slug, thumb, real_title, True)
         if ref:
             media_refs.append(ref)
-    for m in await asyncio.to_thread(_fetch_media_urls, real_title, 4):
+    for m in await asyncio.to_thread(_fetch_media_urls, real_title, 2):
         ref = await _store_media(slug, m["url"], m["caption"], False)
         if ref:
             media_refs.append(ref)
 
-    text_payload = {
-        "slug": slug, "title": real_title,
-        "description": lead_desc,
-        "lead_html": lead_html,
-        "sections": sections,
-        "media": media_refs,
+    return {
+        "slug": slug, "title": real_title, "description": lead_desc,
+        "lead_html_raw": lead_html, "sections_raw": sections, "media": media_refs,
     }
-    size_bytes = len(lead_html) + sum(len(s["html"]) for s in sections)
-    return {"payload": text_payload, "size_bytes": size_bytes, "slug": slug, "title": real_title}
+
+
+def _strip_links(h: str) -> str:
+    return re.sub(r"<a[^>]*>(.*?)</a>", r"\1", h or "", flags=re.S)
+
+
+async def _relinkify_all():
+    """Rebuild cross-article links across the whole corpus from raw text."""
+    docs = await db.text_disk.find(
+        {}, {"_id": 0, "slug": 1, "title": 1, "lead_html_raw": 1, "sections_raw": 1,
+             "lead_html": 1, "sections": 1}
+    ).to_list(None)
+    mapping = {d["title"]: d["slug"] for d in docs}
+    for d in docs:
+        raw_lead = d.get("lead_html_raw")
+        if raw_lead is None:
+            raw_lead = _strip_links(d.get("lead_html", ""))
+        raw_secs = d.get("sections_raw")
+        if raw_secs is None:
+            raw_secs = [{"title": s["title"], "anchor": s["anchor"],
+                         "html": _strip_links(s["html"])} for s in d.get("sections", [])]
+        lead = _linkify(raw_lead, mapping, d["slug"])
+        secs = [{"title": s["title"], "anchor": s["anchor"],
+                 "html": _linkify(s["html"], mapping, d["slug"])} for s in raw_secs]
+        size = len(raw_lead) + sum(len(s["html"]) for s in raw_secs)
+        await db.text_disk.update_one(
+            {"slug": d["slug"]},
+            {"$set": {"lead_html_raw": raw_lead, "sections_raw": raw_secs,
+                      "lead_html": lead, "sections": secs, "size_bytes": size}},
+        )
+
+
+async def _seed_titles(titles: list):
+    for title in titles:
+        seed_state["current"] = title
+        try:
+            if await db.text_disk.find_one({"slug": slugify_title(title)}, {"_id": 1}):
+                seed_state["done"] += 1
+                continue
+            payload = await _seed_one(title)
+            doc = {"id": str(uuid.uuid4()), **payload,
+                   "lead_html": payload["lead_html_raw"],
+                   "sections": payload["sections_raw"],
+                   "size_bytes": len(payload["lead_html_raw"]) + sum(len(s["html"]) for s in payload["sections_raw"]),
+                   "created_at": datetime.now(timezone.utc).isoformat()}
+            await db.text_disk.replace_one({"slug": payload["slug"]}, doc, upsert=True)
+        except Exception as e:
+            logger.error(f"seed failed {title}: {e}")
+            seed_state["errors"].append(f"{title}: {str(e)[:120]}")
+        seed_state["done"] += 1
+        await asyncio.sleep(0.9)
+    seed_state["current"] = "linking articles together"
+    await _relinkify_all()
 
 
 async def _run_seed():
     global seed_state
-    seed_state = {"state": "running", "done": 0, "total": len(CURATED_TITLES), "current": "", "errors": []}
-    raw = []
-    for title in CURATED_TITLES:
-        seed_state["current"] = title
-        try:
-            raw.append(await _seed_one(title))
-        except Exception as e:
-            logger.error(f"seed failed {title}: {e}")
-            seed_state["errors"].append(f"{title}: {e}")
-        seed_state["done"] += 1
-        await asyncio.sleep(1.2)
-
-    mapping = {r["title"]: r["slug"] for r in raw}
-    for r in raw:
-        p = r["payload"]
-        p["lead_html"] = _linkify(p["lead_html"], mapping, p["slug"])
-        for s in p["sections"]:
-            s["html"] = _linkify(s["html"], mapping, p["slug"])
-        size = len(p["lead_html"]) + sum(len(s["html"]) for s in p["sections"])
-        doc = {
-            "id": str(uuid.uuid4()), **p, "size_bytes": size,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.text_disk.replace_one({"slug": p["slug"]}, doc, upsert=True)
-
+    seed_state = {"state": "running", "phase": "seeding", "done": 0,
+                  "total": len(CURATED_TITLES), "current": "", "errors": []}
+    await _seed_titles(CURATED_TITLES)
     seed_state["state"] = "done"
     seed_state["current"] = ""
     logger.info("seed complete")
+
+
+# ----------------------------------------------------------------------------
+# Archive expansion — crawl the Wikipedia link graph for an interlinked corpus
+# ----------------------------------------------------------------------------
+def _fetch_links(title: str) -> list:
+    out = []
+    params = {"action": "query", "prop": "links", "titles": title,
+              "plnamespace": 0, "pllimit": "max", "format": "json", "redirects": 1}
+    try:
+        data = _wiki_get(ACTION, params=params).json()
+        for p in data.get("query", {}).get("pages", {}).values():
+            for lk in p.get("links", []):
+                out.append(lk["title"])
+    except Exception:
+        pass
+    return out
+
+
+def _valid_candidate(title: str) -> bool:
+    low = title.lower()
+    if ":" in title or "(identifier)" in low or "(disambiguation)" in low:
+        return False
+    if low.startswith(("list of", "index of", "outline of", "timeline of", "history of")):
+        return False
+    return 1 < len(title) <= 80
+
+
+async def _discover_titles(roots: list, target: int, existing_slugs: set) -> list:
+    counter = Counter()
+    for root in roots[:40]:
+        seed_state["current"] = f"mapping links · {root}"
+        for t in await asyncio.to_thread(_fetch_links, root):
+            if _valid_candidate(t) and slugify_title(t) not in existing_slugs:
+                counter[t] += 1
+        await asyncio.sleep(0.35)
+    needed = max(target - len(existing_slugs), 0)
+    return [t for t, _ in counter.most_common()][:needed]
+
+
+async def _run_expand(target: int):
+    global seed_state
+    seed_state = {"state": "running", "phase": "discovering", "done": 0,
+                  "total": 0, "current": "", "errors": []}
+    docs = await db.text_disk.find({}, {"_id": 0, "title": 1, "slug": 1}).to_list(None)
+    existing = {d["slug"] for d in docs}
+    roots = [d["title"] for d in docs] or CURATED_TITLES
+    titles = await _discover_titles(roots, target, existing)
+    seed_state["phase"] = "seeding"
+    seed_state["total"] = len(titles)
+    await _seed_titles(titles)
+    seed_state["state"] = "done"
+    seed_state["current"] = ""
+    logger.info(f"expand complete (+{len(titles)} targeted, goal {target})")
+
+
+# ----------------------------------------------------------------------------
+# Burn to Disc — build real ISO 9660 disc images for the two M-Discs
+# ----------------------------------------------------------------------------
+DISC_CSS = """
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#202122;
+background:#fff;margin:0;line-height:1.7}
+.wrap{max-width:900px;margin:0 auto;padding:24px}
+h1{font-family:Georgia,'Times New Roman',serif;font-size:2.2rem;border-bottom:1px solid #a2a9b1;padding-bottom:6px}
+h2{font-family:Georgia,serif;font-size:1.5rem;border-bottom:1px solid #eaecf0;padding-bottom:4px;margin-top:1.6em}
+h3{font-family:Georgia,serif}
+a{color:#3366cc;text-decoration:none}a:hover{text-decoration:underline}
+.desc{color:#54595d;font-style:italic;margin-top:-4px}
+.back{font-size:.9rem}
+.infobox{float:right;width:300px;background:#f8f9fa;border:1px solid #a2a9b1;padding:6px;margin:0 0 16px 20px}
+.infobox img{width:100%;height:auto}
+.thumb{float:right;width:240px;background:#f8f9fa;border:1px solid #c8ccd1;padding:4px;margin:0 0 12px 18px}
+.thumb img{width:100%;height:auto}
+figcaption{font-size:.8rem;color:#54595d;padding:4px}
+.toc{display:inline-block;background:#f8f9fa;border:1px solid #c8ccd1;padding:10px 16px;margin:12px 0}
+.toc ol{margin:6px 0 0 18px}
+footer{margin-top:40px;padding-top:12px;border-top:1px solid #eaecf0;color:#72777d;font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:16px}
+.card{display:flex;gap:10px;align-items:center;border:1px solid #eaecf0;padding:8px}
+.card:hover{background:#f8f9fa;border-color:#a2a9b1}
+.card img{width:52px;height:52px;object-fit:cover;border:1px solid #c8ccd1}
+.card span{font-family:Georgia,serif}
+.badge{display:inline-block;background:#eaecf0;border:1px solid #a2a9b1;padding:2px 8px;font-size:.8rem;margin-bottom:12px}
+""".strip()
+
+TEXT_README = (
+    "OFFLINE WIKIPEDIA — TEXT DISC (Drive 0)\n"
+    "=======================================\n\n"
+    "This M-Disc holds the article TEXT of an offline Wikipedia archive.\n"
+    "Open index.html in any web browser to start browsing. Articles link to\n"
+    "each other, recreating the Wikipedia web experience with no internet.\n\n"
+    "Images live on the companion MEDIA DISC (Drive 1). Pages reference images\n"
+    "at ../media/<id>. To view images, mount the Media Disc and copy or link its\n"
+    "'media' folder next to this disc's content, or browse both from a single\n"
+    "combined copy.\n\n"
+    "Hardware: written to Verbatim M-DISC 100GB via ASUS ZenDrive U9M.\n"
+)
+MEDIA_README = (
+    "OFFLINE WIKIPEDIA — MEDIA DISC (Drive 1)\n"
+    "========================================\n\n"
+    "This M-Disc holds the IMAGES for the offline Wikipedia archive. Each file in\n"
+    "the 'media' folder is referenced by the article pages on the TEXT DISC.\n"
+    "See manifest.json for the id -> article mapping.\n\n"
+    "Hardware: written to Verbatim M-DISC 100GB via ASUS ZenDrive U9M.\n"
+)
+
+MEDIA_EXT = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+             "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg"}
+
+
+def _media_ext(ct: str) -> str:
+    ct = (ct or "").split(";")[0].strip().lower()
+    return MEDIA_EXT.get(ct, (ct.split("/")[-1] or "img"))
+
+
+def _fix_links(h: str) -> str:
+    return re.sub(r'data-wikilink="([^"]+)"', r'href="\1.html"', h or "")
+
+
+def _article_html(doc: dict, ext_map: dict) -> str:
+    media = doc.get("media", [])
+    lead = next((m for m in media if m.get("is_lead")), None)
+    inline = [m for m in media if not m.get("is_lead")]
+    p = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
+         '<meta name="viewport" content="width=device-width, initial-scale=1">',
+         f'<title>{html.escape(doc["title"])} — Offline Wikipedia</title>',
+         '<link rel="stylesheet" href="../assets/style.css"></head><body><div class="wrap">',
+         '<p class="back"><a href="../index.html">&larr; Offline Wikipedia</a></p>',
+         f'<h1>{html.escape(doc["title"])}</h1>']
+    if doc.get("description"):
+        p.append(f'<p class="desc">{html.escape(doc["description"])}</p>')
+    if lead:
+        ext = ext_map.get(lead["id"], "jpg")
+        p.append(f'<figure class="infobox"><img src="../media/{lead["id"]}.{ext}" alt="">'
+                 f'<figcaption>{html.escape(lead.get("caption",""))}</figcaption></figure>')
+    if doc.get("sections"):
+        p.append('<nav class="toc"><b>Contents</b><ol>')
+        for s in doc["sections"]:
+            p.append(f'<li><a href="#{s["anchor"]}">{html.escape(s["title"])}</a></li>')
+        p.append('</ol></nav>')
+    p.append('<div class="body">')
+    p.append(_fix_links(doc.get("lead_html", "")))
+    for i, s in enumerate(doc.get("sections", [])):
+        p.append(f'<h2 id="{s["anchor"]}">{html.escape(s["title"])}</h2>')
+        if i < len(inline):
+            m = inline[i]
+            ext = ext_map.get(m["id"], "jpg")
+            p.append(f'<figure class="thumb"><img src="../media/{m["id"]}.{ext}" alt="">'
+                     f'<figcaption>{html.escape(m.get("caption",""))}</figcaption></figure>')
+        p.append(_fix_links(s.get("html", "")))
+    p.append('</div><footer>Retrieved offline from the Text Disc (Drive 0) and Media Disc '
+             '(Drive 1). Content from Wikipedia, the free encyclopedia.</footer></div></body></html>')
+    return "".join(p)
+
+
+def _index_html(docs: list, ext_map: dict) -> str:
+    cards = []
+    for d in sorted(docs, key=lambda x: x["title"].lower()):
+        lead = next((m for m in d.get("media", []) if m.get("is_lead")), None)
+        img = (f'<img src="media/{lead["id"]}.{ext_map.get(lead["id"],"jpg")}" alt="">'
+               if lead else "")
+        cards.append(f'<a class="card" href="articles/{d["slug"]}.html">{img}'
+                     f'<span>{html.escape(d["title"])}</span></a>')
+    return ("".join([
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<title>Offline Wikipedia</title>',
+        '<link rel="stylesheet" href="assets/style.css"></head><body><div class="wrap">',
+        '<span class="badge">OFFLINE · SERVED FROM M-DISC</span>',
+        '<h1>Offline Wikipedia</h1>',
+        f'<p class="desc">The free encyclopedia, archived to disc — {len(docs)} articles. '
+        'No internet required.</p>',
+        '<div class="grid">', "".join(cards), '</div></div></body></html>',
+    ]))
+
+
+def make_iso(vol_ident: str, files: list) -> bytes:
+    iso = pycdlib.PyCdlib()
+    iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", vol_ident=vol_ident[:16])
+    dir_map = {"": ""}
+    dcount = [0]
+    fcount = [0]
+
+    def ensure_dir(real_dir: str) -> str:
+        if real_dir in dir_map:
+            return dir_map[real_dir]
+        parent, _, name = real_dir.rpartition("/")
+        parent_iso = ensure_dir(parent)
+        dcount[0] += 1
+        iso_path = f"{parent_iso}/D{dcount[0]:04d}"
+        iso.add_directory(iso_path, rr_name=name, joliet_path="/" + real_dir)
+        dir_map[real_dir] = iso_path
+        return iso_path
+
+    for f in files:
+        path = f["path"].strip("/")
+        rdir, _, fname = path.rpartition("/")
+        parent_iso = ensure_dir(rdir) if rdir else ""
+        fcount[0] += 1
+        ext = fname.rsplit(".", 1)[-1] if "." in fname else "dat"
+        ext3 = re.sub(r"[^A-Z0-9]", "", ext.upper())[:3] or "DAT"
+        iso_file = f"{parent_iso}/F{fcount[0]:05d}.{ext3};1"
+        data = f["data"]
+        iso.add_fp(io.BytesIO(data), len(data), iso_file, rr_name=fname, joliet_path="/" + path)
+
+    buf = io.BytesIO()
+    iso.write_fp(buf)
+    iso.close()
+    return buf.getvalue()
+
+
+async def _read_media_bytes(m: dict) -> Optional[bytes]:
+    if m.get("storage_backend") == "objstore" and m.get("storage_path"):
+        try:
+            data, _ = await asyncio.to_thread(get_object, m["storage_path"])
+            return data
+        except Exception as e:
+            logger.warning(f"media read for burn failed: {e}")
+            return None
+    return m.get("inline_bytes")
+
+
+async def _store_export(name: str, data: bytes) -> dict:
+    if STORAGE_OK:
+        try:
+            path = f"{APP_NAME}/exports/{name}"
+            result = await asyncio.to_thread(put_object, path, data, "application/x-iso9660-image")
+            return {"backend": "objstore", "location": result["path"], "size": len(data)}
+        except Exception as e:
+            logger.warning(f"export objstore put failed, writing local: {e}")
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    fp = EXPORT_DIR / name
+    await asyncio.to_thread(fp.write_bytes, data)
+    return {"backend": "local", "location": str(fp), "size": len(data)}
+
+
+async def _run_burn():
+    global burn_state
+    burn_state = {"state": "running", "step": "loading archive", "progress": 0, "total": 0, "error": ""}
+    try:
+        docs = await db.text_disk.find({}, {"_id": 0}).to_list(None)
+        medias = await db.media_disk.find({"is_deleted": False}, {"_id": 0}).to_list(None)
+        if not docs:
+            raise RuntimeError("archive is empty — seed articles first")
+        ext_map = {m["id"]: _media_ext(m.get("content_type")) for m in medias}
+        burn_state["total"] = len(medias)
+
+        burn_state["step"] = "writing text pages"
+        text_files = [
+            {"path": "index.html", "data": _index_html(docs, ext_map).encode("utf-8")},
+            {"path": "assets/style.css", "data": DISC_CSS.encode("utf-8")},
+            {"path": "README.txt", "data": TEXT_README.encode("utf-8")},
+        ]
+        for d in docs:
+            text_files.append({"path": f'articles/{d["slug"]}.html',
+                               "data": _article_html(d, ext_map).encode("utf-8")})
+            jd = {k: d.get(k) for k in ("slug", "title", "description", "lead_html", "sections")}
+            text_files.append({"path": f'data/{d["slug"]}.json',
+                               "data": json.dumps(jd, ensure_ascii=False).encode("utf-8")})
+
+        burn_state["step"] = "building TEXT DISC image"
+        text_iso = await asyncio.to_thread(make_iso, "OWIKI_TEXT", text_files)
+
+        burn_state["step"] = "reading Media Disk"
+        media_files = []
+        manifest = []
+        for i, m in enumerate(medias):
+            data = await _read_media_bytes(m)
+            burn_state["progress"] = i + 1
+            if data is None:
+                continue
+            fn = f'media/{m["id"]}.{ext_map[m["id"]]}'
+            media_files.append({"path": fn, "data": data})
+            manifest.append({"id": m["id"], "article": m.get("article_slug"),
+                             "caption": m.get("caption"), "file": fn})
+        img_count = len(media_files)
+        media_files.append({"path": "manifest.json",
+                            "data": json.dumps(manifest, ensure_ascii=False).encode("utf-8")})
+        media_files.append({"path": "README.txt", "data": MEDIA_README.encode("utf-8")})
+
+        burn_state["step"] = "building MEDIA DISC image"
+        media_iso = await asyncio.to_thread(make_iso, "OWIKI_MEDIA", media_files)
+
+        burn_state["step"] = "finalizing"
+        text_entry = await _store_export("offline-wiki-text.iso", text_iso)
+        media_entry = await _store_export("offline-wiki-media.iso", media_iso)
+        rec = {
+            "id": "latest", "created_at": datetime.now(timezone.utc).isoformat(),
+            "text": {**text_entry, "article_count": len(docs)},
+            "media": {**media_entry, "image_count": img_count},
+        }
+        await db.exports.replace_one({"id": "latest"}, rec, upsert=True)
+        burn_state = {"state": "done", "step": "done", "progress": len(medias),
+                      "total": len(medias), "error": "",
+                      "text_size": len(text_iso), "media_size": len(media_iso)}
+        logger.info("burn complete")
+    except Exception as e:
+        logger.exception("burn failed")
+        burn_state = {"state": "error", "step": "", "progress": 0, "total": 0, "error": str(e)[:200]}
 
 
 # ----------------------------------------------------------------------------
@@ -384,19 +715,66 @@ async def seed(force: bool = False):
     return {"state": "started", "total": len(CURATED_TITLES)}
 
 
+@api_router.post("/seed/expand")
+async def seed_expand(target: int = 150):
+    if seed_state["state"] == "running":
+        return {"state": "running", "detail": "an archive operation is already in progress"}
+    target = max(20, min(target, 600))
+    asyncio.create_task(_run_expand(target))
+    return {"state": "started", "target": target}
+
+
 async def _effective_seed_state() -> dict:
     if seed_state["state"] == "running":
         return seed_state
     count = await db.text_disk.count_documents({})
     if count >= len(CURATED_TITLES):
-        return {"state": "done", "done": len(CURATED_TITLES), "total": len(CURATED_TITLES),
-                "current": "", "errors": seed_state.get("errors", [])}
+        st = dict(seed_state)
+        st.update({"state": "done", "done": st.get("total", count), "current": ""})
+        if st.get("total", 0) < count:
+            st["total"] = count
+        return st
     return seed_state
 
 
 @api_router.get("/seed/status")
 async def seed_status():
     return await _effective_seed_state()
+
+
+@api_router.post("/burn")
+async def burn_start():
+    if burn_state["state"] == "running":
+        return {"state": "running", "detail": "disc images are already being built"}
+    asyncio.create_task(_run_burn())
+    return {"state": "started"}
+
+
+@api_router.get("/burn/status")
+async def burn_status():
+    rec = await db.exports.find_one({"id": "latest"}, {"_id": 0})
+    return {"burn": burn_state, "export": rec}
+
+
+@api_router.get("/burn/download/{which}")
+async def burn_download(which: str):
+    if which not in ("text", "media"):
+        raise HTTPException(status_code=404, detail="unknown disc")
+    rec = await db.exports.find_one({"id": "latest"}, {"_id": 0})
+    if not rec or which not in rec:
+        raise HTTPException(status_code=404, detail="no disc image built yet")
+    entry = rec[which]
+    if entry.get("backend") == "objstore":
+        data, _ = await asyncio.to_thread(get_object, entry["location"])
+    else:
+        fp = Path(entry["location"])
+        if not fp.exists():
+            raise HTTPException(status_code=404, detail="disc image missing; rebuild it")
+        data = await asyncio.to_thread(fp.read_bytes)
+    return Response(
+        content=data, media_type="application/x-iso9660-image",
+        headers={"Content-Disposition": f'attachment; filename="offline-wiki-{which}.iso"'},
+    )
 
 
 @api_router.get("/articles")

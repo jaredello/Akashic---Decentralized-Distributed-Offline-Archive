@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { DiskMonitor } from "@/components/DiskMonitor";
 import Portal from "@/pages/Portal";
 import Article from "@/pages/Article";
+import Burn from "@/pages/Burn";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Portal />} />
             <Route path="/wiki/:slug" element={<Article />} />
+            <Route path="/burn" element={<Burn />} />
           </Routes>
           <DiskMonitor />
         </DiskProvider>

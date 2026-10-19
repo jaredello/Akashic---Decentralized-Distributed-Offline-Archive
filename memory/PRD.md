@@ -39,10 +39,19 @@ entirely offline — hosting the site from the discs instead of the internet.
 - Everything served offline at read time (no internet calls once seeded).
 
 ## Implemented (2026-06)
-- Full dual-disk offline Wikipedia demo: 18 seeded articles, 90 images.
+- Full dual-disk offline Wikipedia demo: initial 18 seeded articles, images on Media Disk.
 - Portal, article reader, autocomplete search, cross-article links.
 - Disk Monitor sidebar with per-drive status, capacity, session byte counters, I/O log.
-- Verified: backend 9/9 tests, frontend flows 100%.
+- **Bigger Archive**: link-graph crawl (`/api/seed/expand`) that ranks the most densely
+  interlinked real Wikipedia pages (identifier/list pages filtered out) and seeds up to
+  ~hundreds; corpus-wide cross-links rebuilt from raw text (`_relinkify_all`). Articles are
+  readable immediately on seed; links finalize when the run completes. UI: slider + progress
+  on the Burn page.
+- **Burn to Disc** (`/burn` tab): builds two real ISO 9660 (Joliet+RockRidge) disc images via
+  pycdlib — Text Disc (browsable offline site: index.html + per-article pages cross-linked +
+  data JSON + CSS) and Media Disc (all images + manifest). Stored to object storage, streamed
+  via `/api/burn/download/{text|media}` with proper Content-Disposition. Verified valid ISOs.
+- Verified: backend 9/9 tests (first MVP), feature endpoints + ISO validity + UI via curl/screenshots.
 
 ## Backlog / future (P1/P2)
 - P1: Real-hardware adapter — replace Text/Media Disk data access with reads from two
