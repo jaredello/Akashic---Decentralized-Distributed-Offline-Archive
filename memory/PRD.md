@@ -62,3 +62,15 @@ entirely offline — hosting the site from the discs instead of the internet.
 
 ## Next tasks
 - Await user feedback; optionally expand the seeded corpus or add hardware bridge.
+
+## Iteration 2 (2026-06) — capacity, checksums, themes, preview
+- **Checksum Manifest**: burn computes SHA-256 of each ISO, shown on disc cards (copy) and
+  downloadable as `SHA256SUMS` via `/api/burn/checksums`; verified it matches the ISO byte-for-byte.
+- **Disc Capacity Planner**: `/api/disks/status` returns a `capacity` block (avg item size,
+  est items per 100 GB disc, headroom, fill %, over-capacity + largest-media warnings). UI card
+  on the Burn page with a warning banner when a disc exceeds 100 GB.
+- **Pick Topics**: theme presets (`/api/seed/themes`); `/api/seed/expand?theme=` seeds a tightly
+  interlinked web around one subject (roots from the theme). UI theme chips.
+- **Combined Preview**: `/api/preview/*` serves the generated Text + Media disc content together
+  (index.html, per-article pages, assets, media) so the offline site is browsable before burning.
+  "Preview" buttons open it in a new tab. Verified index + article render with images loaded.

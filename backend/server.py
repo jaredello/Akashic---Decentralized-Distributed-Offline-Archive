@@ -5,6 +5,7 @@ import time
 import json
 import uuid
 import html
+import hashlib
 import asyncio
 import logging
 from collections import Counter
@@ -16,7 +17,7 @@ import requests
 import pycdlib
 from bs4 import BeautifulSoup, NavigableString
 from fastapi import FastAPI, APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse, PlainTextResponse, RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -109,6 +110,33 @@ CURATED_TITLES = [
 seed_state = {"state": "idle", "phase": "", "done": 0, "total": len(CURATED_TITLES), "current": "", "errors": []}
 burn_state = {"state": "idle", "step": "", "progress": 0, "total": 0, "error": ""}
 EXPORT_DIR = Path("/tmp/offline_wiki_exports")
+
+# "Pick Topics" — theme presets seed a tightly interlinked web around a subject.
+THEMES = {
+    "space": {"label": "Space & Astronomy", "roots": [
+        "Solar System", "Jupiter", "Saturn", "Mars", "Sun", "Moon", "Black hole",
+        "Galaxy", "Milky Way", "NASA", "Apollo 11", "Astronomy", "Star", "Planet",
+        "Telescope", "Big Bang"]},
+    "history": {"label": "History", "roots": [
+        "Ancient Rome", "Ancient Greece", "Ancient Egypt", "Roman Empire", "Middle Ages",
+        "Renaissance", "World War II", "World War I", "French Revolution", "Napoleon",
+        "Byzantine Empire", "Industrial Revolution"]},
+    "science": {"label": "Science", "roots": [
+        "Physics", "Chemistry", "Biology", "DNA", "Photosynthesis", "Evolution", "Atom",
+        "Energy", "Gravity", "Cell (biology)", "Periodic table", "Electricity"]},
+    "nature": {"label": "Nature & Animals", "roots": [
+        "Lion", "Octopus", "Elephant", "Volcano", "Ocean", "Tiger", "Whale", "Bird",
+        "Tree", "Coral reef", "Rainforest", "Insect"]},
+    "art_culture": {"label": "Art & Culture", "roots": [
+        "Leonardo da Vinci", "William Shakespeare", "Painting", "Music", "Film",
+        "Literature", "Vincent van Gogh", "Classical music", "Sculpture", "Theatre"]},
+    "technology": {"label": "Technology", "roots": [
+        "Internet", "Computer", "Artificial intelligence", "Electricity", "Telephone",
+        "Software", "Robotics", "Smartphone", "World Wide Web", "Semiconductor"]},
+    "geography": {"label": "Geography", "roots": [
+        "Mount Everest", "Great Wall of China", "Great Pyramid of Giza", "Mountain",
+        "River", "Continent", "Desert", "Ocean", "Volcano", "Island", "Lake"]},
+}
 
 
 def slugify_title(title: str) -> str:
@@ -432,20 +460,35 @@ async def _discover_titles(roots: list, target: int, existing_slugs: set) -> lis
     return [t for t, _ in counter.most_common()][:needed]
 
 
-async def _run_expand(target: int):
+async def _run_expand(target: int, theme: Optional[str] = None):
     global seed_state
     seed_state = {"state": "running", "phase": "discovering", "done": 0,
-                  "total": 0, "current": "", "errors": []}
+                  "total": 0, "current": "", "errors": [], "theme": theme or ""}
     docs = await db.text_disk.find({}, {"_id": 0, "title": 1, "slug": 1}).to_list(None)
     existing = {d["slug"] for d in docs}
-    roots = [d["title"] for d in docs] or CURATED_TITLES
-    titles = await _discover_titles(roots, target, existing)
+
+    theme_roots = THEMES.get(theme, {}).get("roots") if theme else None
+    if theme_roots:
+        roots = theme_roots
+        base = [t for t in theme_roots if slugify_title(t) not in existing]
+    else:
+        roots = [d["title"] for d in docs] or CURATED_TITLES
+        base = []
+
+    candidates = await _discover_titles(roots, target, existing)
+    titles = list(base)
+    for t in candidates:
+        if slugify_title(t) not in existing and t not in titles:
+            titles.append(t)
+    needed = max(target - len(existing), 0)
+    titles = titles[:needed]
+
     seed_state["phase"] = "seeding"
     seed_state["total"] = len(titles)
     await _seed_titles(titles)
     seed_state["state"] = "done"
     seed_state["current"] = ""
-    logger.info(f"expand complete (+{len(titles)} targeted, goal {target})")
+    logger.info(f"expand complete (+{len(titles)} targeted, goal {target}, theme {theme})")
 
 
 # ----------------------------------------------------------------------------
@@ -676,12 +719,16 @@ async def _run_burn():
         media_iso = await asyncio.to_thread(make_iso, "OWIKI_MEDIA", media_files)
 
         burn_state["step"] = "finalizing"
+        text_sha = hashlib.sha256(text_iso).hexdigest()
+        media_sha = hashlib.sha256(media_iso).hexdigest()
         text_entry = await _store_export("offline-wiki-text.iso", text_iso)
         media_entry = await _store_export("offline-wiki-media.iso", media_iso)
         rec = {
             "id": "latest", "created_at": datetime.now(timezone.utc).isoformat(),
-            "text": {**text_entry, "article_count": len(docs)},
-            "media": {**media_entry, "image_count": img_count},
+            "text": {**text_entry, "article_count": len(docs), "sha256": text_sha,
+                     "filename": "offline-wiki-text.iso"},
+            "media": {**media_entry, "image_count": img_count, "sha256": media_sha,
+                      "filename": "offline-wiki-media.iso"},
         }
         await db.exports.replace_one({"id": "latest"}, rec, upsert=True)
         burn_state = {"state": "done", "step": "done", "progress": len(medias),
@@ -715,13 +762,20 @@ async def seed(force: bool = False):
     return {"state": "started", "total": len(CURATED_TITLES)}
 
 
+@api_router.get("/seed/themes")
+async def seed_themes():
+    return [{"key": k, "label": v["label"]} for k, v in THEMES.items()]
+
+
 @api_router.post("/seed/expand")
-async def seed_expand(target: int = 150):
+async def seed_expand(target: int = 150, theme: Optional[str] = None):
     if seed_state["state"] == "running":
         return {"state": "running", "detail": "an archive operation is already in progress"}
+    if theme and theme not in THEMES:
+        raise HTTPException(status_code=400, detail="unknown theme")
     target = max(20, min(target, 600))
-    asyncio.create_task(_run_expand(target))
-    return {"state": "started", "target": target}
+    asyncio.create_task(_run_expand(target, theme))
+    return {"state": "started", "target": target, "theme": theme}
 
 
 async def _effective_seed_state() -> dict:
@@ -774,6 +828,27 @@ async def burn_download(which: str):
     return Response(
         content=data, media_type="application/x-iso9660-image",
         headers={"Content-Disposition": f'attachment; filename="offline-wiki-{which}.iso"'},
+    )
+
+
+@api_router.get("/burn/checksums")
+async def burn_checksums():
+    rec = await db.exports.find_one({"id": "latest"}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="no disc images built yet")
+    lines = [
+        "# Offline Wikipedia — disc image checksums (SHA-256)",
+        f"# built {rec.get('created_at', '')}",
+        "#",
+        "# Verify after writing with:  sha256sum -c SHA256SUMS",
+        "",
+        f"{rec['text'].get('sha256', '')}  {rec['text'].get('filename', 'offline-wiki-text.iso')}",
+        f"{rec['media'].get('sha256', '')}  {rec['media'].get('filename', 'offline-wiki-media.iso')}",
+        "",
+    ]
+    return PlainTextResponse(
+        "\n".join(lines),
+        headers={"Content-Disposition": 'attachment; filename="SHA256SUMS"'},
     )
 
 
@@ -837,6 +912,55 @@ async def get_media(media_id: str):
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
+async def _load_corpus():
+    docs = await db.text_disk.find({}, {"_id": 0}).to_list(None)
+    medias = await db.media_disk.find(
+        {"is_deleted": False}, {"_id": 0, "id": 1, "content_type": 1}
+    ).to_list(None)
+    ext_map = {m["id"]: _media_ext(m.get("content_type")) for m in medias}
+    return docs, ext_map
+
+
+# Combined Preview — serves the generated Text Disc + Media Disc together so the
+# offline site can be test-browsed before burning. Relative links resolve under /api/preview.
+@api_router.get("/preview", include_in_schema=False)
+async def preview_root_noslash():
+    return RedirectResponse(url="preview/index.html")
+
+
+@api_router.get("/preview/", include_in_schema=False)
+async def preview_root():
+    return RedirectResponse(url="index.html")
+
+
+@api_router.get("/preview/index.html", response_class=HTMLResponse)
+async def preview_index():
+    docs, ext_map = await _load_corpus()
+    return HTMLResponse(_index_html(docs, ext_map))
+
+
+@api_router.get("/preview/assets/style.css")
+async def preview_css():
+    return Response(DISC_CSS, media_type="text/css")
+
+
+@api_router.get("/preview/articles/{slug}", response_class=HTMLResponse)
+async def preview_article(slug: str):
+    if slug.endswith(".html"):
+        slug = slug[:-5]
+    doc = await db.text_disk.find_one({"slug": slug}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="article not on disc")
+    _, ext_map = await _load_corpus()
+    return HTMLResponse(_article_html(doc, ext_map))
+
+
+@api_router.get("/preview/media/{fname}")
+async def preview_media(fname: str):
+    media_id = fname.rsplit(".", 1)[0]
+    return await get_media(media_id)
+
+
 @api_router.get("/disks/status")
 async def disks_status():
     text_count = await db.text_disk.count_documents({})
@@ -845,8 +969,30 @@ async def disks_status():
     async for d in db.text_disk.find({}, {"_id": 0, "size_bytes": 1}):
         text_used += d.get("size_bytes", 0)
     media_used = 0
+    largest_media = 0
     async for d in db.media_disk.find({"is_deleted": False}, {"_id": 0, "size_bytes": 1}):
-        media_used += d.get("size_bytes", 0)
+        sz = d.get("size_bytes", 0)
+        media_used += sz
+        largest_media = max(largest_media, sz)
+
+    def _plan(used, count, total):
+        avg = (used / count) if count else 0
+        est_capacity = int(total / avg) if avg else 0
+        return {
+            "avg_item_bytes": int(avg),
+            "est_items_per_disc": est_capacity,
+            "headroom_items": max(est_capacity - count, 0),
+            "fill_pct": round((used / total) * 100, 4),
+            "over_capacity": used > total,
+        }
+
+    capacity = {
+        "disc_bytes": DISK_TOTAL_BYTES,
+        "text": _plan(text_used, text_count, DISK_TOTAL_BYTES),
+        "media": _plan(media_used, media_count, DISK_TOTAL_BYTES),
+        "largest_media_bytes": largest_media,
+        "largest_media_over_disc": largest_media > DISK_TOTAL_BYTES,
+    }
     return {
         "hardware": {"drive_model": DRIVE_MODEL, "medium": MEDIUM, "drive_count": 2},
         "text_disk": {
@@ -859,6 +1005,7 @@ async def disks_status():
             "total_bytes": DISK_TOTAL_BYTES, "used_bytes": media_used,
             "image_count": media_count, "status": "READY" if media_count else "EMPTY",
         },
+        "capacity": capacity,
         "seed": await _effective_seed_state(),
     }
 

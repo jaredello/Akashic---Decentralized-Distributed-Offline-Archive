@@ -1,5 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import { DiskProvider } from "@/context/DiskContext";
 import { Header } from "@/components/Header";
 import { DiskMonitor } from "@/components/DiskMonitor";
@@ -21,6 +22,7 @@ function App() {
           <DiskMonitor />
         </DiskProvider>
       </BrowserRouter>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
