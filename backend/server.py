@@ -384,9 +384,19 @@ async def seed(force: bool = False):
     return {"state": "started", "total": len(CURATED_TITLES)}
 
 
+async def _effective_seed_state() -> dict:
+    if seed_state["state"] == "running":
+        return seed_state
+    count = await db.text_disk.count_documents({})
+    if count >= len(CURATED_TITLES):
+        return {"state": "done", "done": len(CURATED_TITLES), "total": len(CURATED_TITLES),
+                "current": "", "errors": seed_state.get("errors", [])}
+    return seed_state
+
+
 @api_router.get("/seed/status")
 async def seed_status():
-    return seed_state
+    return await _effective_seed_state()
 
 
 @api_router.get("/articles")
@@ -471,7 +481,7 @@ async def disks_status():
             "total_bytes": DISK_TOTAL_BYTES, "used_bytes": media_used,
             "image_count": media_count, "status": "READY" if media_count else "EMPTY",
         },
-        "seed": seed_state,
+        "seed": await _effective_seed_state(),
     }
 
 

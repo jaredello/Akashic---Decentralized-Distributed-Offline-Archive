@@ -1,0 +1,40 @@
+{
+  "summary": "Tested backend (9 pytest cases) and frontend (Portal + Article + DiskMonitor + Search + cross-links) for the Offline Wikipedia Dual M-Disc app. 8/9 backend tests pass; the only failure is that /api/disks/status reports seed.state='idle' instead of 'done' because seed_state is kept in process memory and resets whenever the backend restarts (data in Mongo is intact: 18 articles, 90 images). All frontend flows work: portal loads with banner + featured + 17 cards, article view renders with TOC/infobox/sections, Disk Monitor shows TEXT DISK (DRIVE 0) + MEDIA DISK (DRIVE 1), close/reopen works, I/O log streams T0 (text) and M1 (media) reads with increasing session READ bytes, search autocomplete navigates to Lion, and in-article data-wikilink anchors navigate (e.g. Lion -> DNA).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/disks/status (and /api/seed/status)",
+        "issue": "seed_state is an in-process dict; after any backend restart it resets to {state:'idle', done:0} even though 18 articles are already persisted in Mongo. UI/API consumers that check seed.state=='done' will be wrong until a reseed is triggered. Fix: derive state from DB (e.g. state='done' when text_disk count == len(CURATED_TITLES)) or persist seed_state to a Mongo collection."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_offline_wiki.py",
+    "/app/test_reports/pytest/offline_wiki.xml"
+  ],
+  "action_items": [
+    "Make seed state resilient to backend restarts by deriving/persisting it instead of using an in-memory dict in server.py; this is the only failing assertion in the review request (seed.state == 'done')."
+  ],
+  "critical_code_review_comments": [
+    "server.py seed_state is in-memory global -> loses state on restart; should be derived from DB counts or stored in Mongo.",
+    "server.py: _linkify replaces only first occurrence per title and iterates all article titles over every text node (O(n*m)) — fine for 18 articles but will not scale; also uses word boundaries that can mis-link common words (e.g. 'DNA' in body text) — acceptable for a demo.",
+    "Backend has no pagination/limits beyond .to_list(500) on /api/articles — fine for seeded set.",
+    "/api/search uses case-insensitive regex only on title; a description/text search would be a natural extension but not required.",
+    "Frontend Portal uses lazy loading on grid thumbnails; works as expected in a browser but Playwright may see naturalWidth=0 before scroll — not a bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_offline_wiki.py (new)"
+  ],
+  "success_rate": {"backend": "89% (8/9)", "frontend": "100%"},
+  "seed_data_creation": "None. Used pre-seeded data (18 articles / 90 images) as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pre-seeded data is already present. test_offline_wiki.py exercises /api/disks/status, /api/articles (list+detail), /api/search, /api/media/{id}, and cross-article data-wikilink. Known issue: seed_state resets to 'idle' on backend restart. Playwright flow verified: Portal -> search 'lio' -> Lion -> cross-link to DNA, Disk Monitor close+reopen, I/O log emits T0 and M1 entries.",
+  "rca of the issue": "test_disks_status failed because server.py keeps seed_state as a module-level dict initialized to {state:'idle'}. _run_seed() mutates it to 'done' in-process, but any backend reload (hot reload on save, supervisor restart) re-imports the module and the dict is reset. Articles/media in Mongo survive, so count-based fields are correct, but seed.state is not. Mitigation: compute seed.state inside /api/disks/status (and /seed/status) from counts: 'done' if text_disk count >= len(CURATED_TITLES) else current in-memory value; or persist seed_state to a `_meta` collection and read on startup."
+}
