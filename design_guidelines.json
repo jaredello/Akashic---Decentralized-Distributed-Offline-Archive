@@ -1,0 +1,119 @@
+{
+  "theme": "hybrid_light_dark",
+  "archetype": "Swiss & High-Contrast (Wiki) + Retro-Futurism (Monitor)",
+  "typography": {
+    "heading_font": "Linux Libertine, Georgia, Times, serif",
+    "body_font": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Lato, Helvetica, Arial, sans-serif",
+    "mono_font": "JetBrains Mono, Fira Code, monospace",
+    "hierarchy": {
+      "h1": "text-4xl font-serif text-[#000000] border-b border-[#eaecf0] pb-2 mb-4",
+      "h2": "text-2xl font-serif text-[#000000] border-b border-[#eaecf0] pb-1 mt-8 mb-4",
+      "h3": "text-xl font-bold text-[#202122] mt-6 mb-2",
+      "body": "text-base text-[#202122] leading-relaxed",
+      "monitor_text": "text-xs font-mono text-[#00FF41] tracking-wider uppercase",
+      "monitor_heading": "text-sm font-bold font-mono text-white tracking-widest uppercase border-b border-gray-800 pb-2 mb-4"
+    }
+  },
+  "colors": {
+    "wiki_bg": "#ffffff",
+    "wiki_surface": "#f8f9fa",
+    "wiki_text": "#202122",
+    "wiki_link": "#3366cc",
+    "wiki_link_visited": "#0b0080",
+    "wiki_link_hover": "#2a4b8d",
+    "wiki_border": "#eaecf0",
+    "wiki_red_link": "#dd3333",
+    "monitor_bg": "#0A0A0A",
+    "monitor_surface": "#121212",
+    "monitor_active": "#00FF41",
+    "monitor_inactive": "#333333",
+    "monitor_warning": "#FFB000"
+  },
+  "visual_enhancers": {
+    "monitor_scanlines": "CSS repeating-linear-gradient overlay on the disk monitor for a terminal CRT effect",
+    "hardware_details": "Subtle 1px borders and grid alignments in the monitor panel to look like technical readouts",
+    "wiki_vector_skin": "Authentic white/gray Wikipedia 2022 skin contrast without drop shadows"
+  },
+  "components": {
+    "search_bar": {
+      "description": "Authentic Wikipedia search input in the header.",
+      "styles": "flex items-center w-full max-w-[400px] bg-[#ffffff] border border-[#a2a9b1] rounded-sm h-8 px-2 focus-within:border-[#3366cc] focus-within:ring-1 focus-within:ring-[#3366cc]"
+    },
+    "offline_badge": {
+      "description": "Badge in the header indicating the app is served from M-Disks offline.",
+      "styles": "flex items-center gap-2 px-3 py-1 bg-[#eaecf0] text-[#202122] text-xs font-bold rounded-sm border border-[#a2a9b1]"
+    },
+    "disk_indicator": {
+      "description": "Blinking LED indicators in the sidebar for Text and Media read activity.",
+      "styles": "w-3 h-3 rounded-full shadow-[0_0_8px_currentColor]"
+    },
+    "wiki_image_thumb": {
+      "description": "Wikipedia style image thumbnail with caption.",
+      "styles": "bg-[#f8f9fa] border border-[#eaecf0] p-1 mb-4 text-xs text-[#54595d]"
+    }
+  },
+  "grids": {
+    "main_grid": "grid-cols-1 md:grid-cols-[200px_1fr_200px] gap-8",
+    "monitor_grid": "grid-cols-2 gap-4"
+  },
+  "layouts": {
+    "app_container": "flex min-h-screen bg-[#ffffff] text-left",
+    "header": "sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-[#ffffff] border-b border-[#eaecf0]",
+    "main_content": "flex-1 w-full max-w-[1000px] mx-auto p-6 md:p-10",
+    "article_layout": "flex flex-col md:flex-row gap-8",
+    "infobox": "md:float-right clear-right w-full md:w-[300px] bg-[#f8f9fa] border border-[#a2a9b1] p-2 md:ml-6 mb-4 text-sm",
+    "disk_monitor": "fixed right-0 top-14 bottom-0 w-80 bg-[#0A0A0A] border-l border-gray-800 p-6 z-50 transform transition-transform duration-300",
+    "toc": "hidden lg:block sticky top-20 w-52 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4"
+  },
+  "motion": {
+    "monitor_toggle": "transform transition-transform duration-300 ease-in-out",
+    "led_blink": "animate-pulse",
+    "hover_link": "underline decoration-[#3366cc] decoration-1 underline-offset-2"
+  },
+  "accessibility": {
+    "focus_states": "focus-visible:ring-2 focus-visible:ring-[#3366cc] focus-visible:outline-none",
+    "contrast_requirements": "All text in the wiki view must meet 4.5:1 against #ffffff. All monitor text must meet 4.5:1 against #0A0A0A.",
+    "reduced_motion": "Respect prefers-reduced-motion for disk blinkers (use opacity change instead of fast pulse)."
+  },
+  "media": {
+    "wiki_images": "Must have gray border with explicit Wikipedia-style caption container below."
+  },
+  "3d_libraries": null,
+  "image_urls": {
+    "disk_hardware": {
+      "url": "https://images.unsplash.com/photo-1748325118762-bd95fc40d25d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwzfHxvcHRpY2FsJTIwZGlzYyUyMGhhcmR3YXJlfGVufDB8fHx8MTc5MjQ0MTQwNnww&ixlib=rb-4.1.0&q=85",
+      "description": "Optical M-Disc for the Text and Media disk logical stores.",
+      "category": "Disk Monitor Theme"
+    },
+    "article_rome": {
+      "url": "https://images.unsplash.com/photo-1626285220266-e35bd313d05b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwzfHxhbmNpZW50JTIwcm9tZSUyMGFyY2hpdGVjdHVyZXxlbnwwfHx8fDE3OTI0NDE0MDZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Image for Ancient Rome article.",
+      "category": "Wikipedia Article Mock Data"
+    },
+    "article_blackhole": {
+      "url": "https://images.unsplash.com/photo-1670884307164-a652a34f23da?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHwxfHxibGFjayUyMGhvbGUlMjBzcGFjZXxlbnwwfHx8fDE3OTI0NDE0MDZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Image for Black Hole article.",
+      "category": "Wikipedia Article Mock Data"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Build the application using pure React and Tailwind CSS. The files should be named .js (not .tsx) as per the stack.",
+    "Do NOT use 'Inter' for the Wikipedia reading view. Use system-ui/sans-serif for body and 'Linux Libertine'/Georgia/serif for H1/H2 to accurately simulate Wikipedia.",
+    "The Disk Monitor should sit on top or alongside the main view. It must feel like a radically different interface: pure black, monospace fonts, glowing green/amber text, simulating a hardware terminal.",
+    "Implement simulated 'streaming': when a user clicks an article, the UI should briefly show the Text Disk indicator blinking fast, then text renders. Moments later, the Media Disk indicator blinks, and the images pop in.",
+    "Create a home portal screen that looks like the Wikipedia Main Page but curated with offline articles (e.g., 'Today's featured article', 'In the news').",
+    "In the Wikipedia view, style links classically: #3366cc, underlined on hover. No modern pill buttons for links. Text layout is left-aligned.",
+    "All interactive elements MUST include data-testid attributes (e.g., data-testid='search-input', data-testid='toggle-monitor').",
+    "Do not use dark colors as gradients for the Wikipedia view. Maintain strict encyclopedic layout."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts. Wikipedia content should be left-aligned and highly structured.",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container. Do not add '.App { text-align: center; }' in the css file.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 for icons.",
+    "Prioritize using pre-existing components from src/components/ui when applicable, but style them down to look like basic HTML components for the Wikipedia side.",
+    "Use sonner for toasts, located in /app/src/components/ui/sonner.js."
+  ]
+}

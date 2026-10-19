@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Lato, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #ffffff;
+  color: #202122;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+/* ---- Wikipedia reading view ---------------------------------------- */
+.wiki-serif {
+  font-family: "Libre Baskerville", "Linux Libertine", Georgia, Times, serif;
+}
+.mono {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.article-body {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #202122;
+}
+.article-body p {
+  margin: 0 0 0.85em 0;
+}
+.article-body ul,
+.article-body ol {
+  margin: 0 0 0.85em 1.6em;
+}
+.article-body ul {
+  list-style: disc;
+}
+.article-body ol {
+  list-style: decimal;
+}
+.article-body li {
+  margin-bottom: 0.25em;
+}
+.article-body h3 {
+  font-family: "Libre Baskerville", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #000;
+  margin: 1.4em 0 0.5em;
+}
+.article-body h4 {
+  font-weight: 700;
+  color: #202122;
+  margin: 1.1em 0 0.4em;
+}
+.article-body b,
+.article-body strong {
+  font-weight: 700;
+}
+.article-body a,
+a.wikilink {
+  color: #3366cc;
+  text-decoration: none;
+  cursor: pointer;
+}
+.article-body a:hover,
+a.wikilink:hover {
+  text-decoration: underline;
+  color: #2a4b8d;
+}
+
+/* ---- Disk monitor (terminal) --------------------------------------- */
+.monitor-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 255, 65, 0.035) 0px,
+    rgba(0, 255, 65, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+@keyframes led-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.led-active {
+  animation: led-pulse 0.5s steps(2, start) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.monitor-log::-webkit-scrollbar {
+  width: 6px;
+}
+.monitor-log::-webkit-scrollbar-thumb {
+  background: #1f3d24;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .led-active {
+    animation: none;
+    opacity: 0.9;
+  }
+}
