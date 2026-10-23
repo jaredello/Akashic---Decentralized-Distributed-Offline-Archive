@@ -5,7 +5,9 @@ import time
 import uuid
 
 from .rules import MEDIA, TEXT, Rules, base_mime
-from .volume import CLUSTER_TARGET, GB, DiscFullError, VolumeWriter, _compress
+from pathlib import Path
+
+from .volume import CLUSTER_TARGET, GB, DiscFullError, VolumeWriter, _compress, check_empty
 
 DISC_SIZES_GB = {"25 GB BD-R": 25, "50 GB BD-R DL": 50, "100 GB M-DISC BDXL": 100, "128 GB BDXL": 128}
 
@@ -90,8 +92,16 @@ def build(source, text_dir, media_dir, capacity_gb=100, rules=None, label="DISCK
     set_id = uuid.uuid4().hex
     cap = capacity_gb * GB
     title = source.title()
+    t_path, m_path = Path(text_dir).expanduser().resolve(), Path(media_dir).expanduser().resolve()
+    if t_path == m_path or t_path in m_path.parents or m_path in t_path.parents:
+        raise ValueError("The Text Disc and Media Disc need two separate folders.")
+    src_root = getattr(source, "root", None)
+    if src_root and any(p == src_root or src_root in p.parents for p in (t_path, m_path)):
+        raise ValueError("Disc folders can't be inside the source folder.")
+    check_empty(t_path)
+    check_empty(m_path)
     tw = VolumeWriter(text_dir, TEXT, set_id, f"{label}_TEXT", cap, compress=True, disc_index=1)
-    mw = VolumeWriter(media_dir, MEDIA, set_id, f"{label}_MEDIA", cap, compress=False, disc_index=2)
+    mw = VolumeWriter(media_dir, MEDIA, set_id, f"{label}_MEDIA", cap, compress=True, disc_index=2)
     with progress.lock:
         progress.phase, progress.total = "building", source.count_hint()
         progress.started = time.time()
@@ -118,7 +128,7 @@ def build(source, text_dir, media_dir, capacity_gb=100, rules=None, label="DISCK
             if role == TEXT:
                 tw.add(it.path, it.mime, data, it.title, compressible=rules.compressible(it.mime))
             else:
-                mw.add(it.path, it.mime, data)
+                mw.add(it.path, it.mime, data, compressible=rules.compressible(it.mime))
                 if it.title:
                     tw.add_title(it.path, it.title)
             with progress.lock:

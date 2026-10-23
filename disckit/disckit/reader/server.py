@@ -53,6 +53,8 @@ class Library:
 
     def search(self, q, limit=20):
         out, seen = [], set()
+        if not q.strip():
+            return out
         for v in self.text:
             for path, title in v.search(q, limit):
                 if path not in seen:

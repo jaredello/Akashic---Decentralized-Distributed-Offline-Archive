@@ -81,3 +81,16 @@ entirely offline — hosting the site from the discs instead of the internet.
 - Blockers in current app: live API crawling too slow (use Wikimedia/Kiwix dumps), cloud pod can't hold 100GB+, ISO9660 -> need UDF for BDXL, full-res images, browser download of 100GB ISO impractical.
 - Future (P1): local CLI pipeline (dump -> text disc + media disc), offline two-drive reader, UDF image builder, capacity planner for full dump.
 - Future (P2): multi-disc spanning (higher-res media across N discs); generalize the dual/multi-disc system for other applications (not just Wikipedia).
+
+## DiscKit for macOS (Jun 2026) — DONE
+Location: /app/disckit (downloadable zip via GET /api/kit/download, info at /api/kit/info; Burn page "DiscKit for Mac" section in components/KitSection.js)
+- Local Archive Builder: Tkinter desktop app (gui.py) + CLI (python -m disckit plan|build|read|drives|image|burn|verify|gui)
+- Sources (universal): Kiwix .zim (libzim), any folder, website crawler (same host + external assets, robots.txt, link rewriting)
+- Disc format disckit/1: DISCKIT.json, index.db (SQLite entries/redirects/titles), packs/pack-NNNNN.bin (<=1GiB), SHA256SUMS; text + SVG compressed in 1MB zstd clusters; images raw; set_id + disc_index/disc_count ready for spanning
+- Rules: text/html/css/js -> Text Disc; image/audio/video/font/pdf -> Media Disc
+- Burn (macOS): drutil burn -udf both drives in parallel, hdiutil makehybrid UDF .iso, verify against SHA256SUMS
+- Two-Drive Reader: stdlib threaded HTTP server serving union of both discs at root, Wikipedia-style shell at /_disckit/ with search, random, closable live Disc I/O monitor
+- Tested: iteration_2 (all issues fixed: non-empty folder rejection, pre-validation, friendly CLI errors, website key dedup, testids, kit whitelist)
+## Backlog
+- P1 Multi-disc spanning (N discs, higher-res media)
+- P2 Full-text search on Text Disc; package as signed .app

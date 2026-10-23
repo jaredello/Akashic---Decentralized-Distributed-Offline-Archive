@@ -61,7 +61,7 @@ export const KitSection = () => {
           <Download size={16} /> Download DiscKit for macOS
         </a>
         <span className="mono text-[11px] text-[#72777d]" data-testid="kit-meta">
-          {info ? `v${info.version} · ${info.file_count} files · ${fmtBytes(info.size_bytes)} · requires Python 3.9+` : "Loading…"}
+          {info ? `v${info.version} · ${info.file_count} files · ${fmtBytes(info.size_bytes)} · requires Python 3.10+` : "Loading…"}
         </span>
       </div>
       <p className="px-5 pb-5 -mt-2 text-xs text-[#72777d] max-w-2xl">

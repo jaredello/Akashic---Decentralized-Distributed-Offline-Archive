@@ -9,7 +9,7 @@ Works with any **Kiwix .zim file** (full English Wikipedia, Wiktionary, Stack Ex
 ## 1. Install (once)
 1. Unzip this folder somewhere permanent (e.g. `~/DiscKit`).
 2. Double-click **install.command**. If macOS blocks it: right-click → Open → Open.
-   It needs Python 3.9+ with Tk — the installer from python.org includes it
+   It needs Python 3.10+ with Tk 8.6 — the installer from python.org includes it
    (Homebrew users: `brew install python python-tk`).
 
 ## 2. Get English Wikipedia

@@ -69,6 +69,7 @@ class WebsiteSource(Source):
         if key == "" or key.endswith("/"):
             key += "index.html"
         link = "/" + prefix + raw_path.lstrip("/")
+        key = key.rstrip("?")
         if u.query:
             key += "?" + u.query
             link += "?" + u.query
@@ -85,6 +86,8 @@ class WebsiteSource(Source):
     def items(self):
         queue = deque([(self.start, 0, True)])
         seen = {self.start}
+        self._keys = {self.key_link(self.start)[0]}
+        stored = set()
         pages = 0
         while queue:
             url, depth, is_page = queue.popleft()
@@ -103,11 +106,12 @@ class WebsiteSource(Source):
             src_kl, dst_kl = self.key_link(url), self.key_link(final)
             if not dst_kl:
                 continue
+            if dst_kl[0] in stored:
+                continue
             if src_kl and src_kl[0] != dst_kl[0]:
                 yield Item(path=src_kl[0], redirect_to=dst_kl[0])
-                if final in seen and final != url:
-                    continue
                 seen.add(final)
+            stored.add(dst_kl[0])
             mime = base_mime(ctype) if ctype else guess_mime(final)
             title = None
             if mime == "text/html":
@@ -133,7 +137,8 @@ class WebsiteSource(Source):
                        load=lambda b=body: b)
 
     def _enqueue(self, queue, seen, url, depth, page):
-        if url in seen:
+        kl = self.key_link(url)
+        if url in seen or not kl or kl[0] in self._keys:
             return
         same = urlparse(url).netloc.lower() == self.host
         if page and (not same or depth > self.max_depth):
@@ -141,6 +146,7 @@ class WebsiteSource(Source):
         if not page and not same and not self.external:
             return
         seen.add(url)
+        self._keys.add(kl[0])
         queue.append((url, depth, page))
 
     def _resolve(self, base, raw, found, page):

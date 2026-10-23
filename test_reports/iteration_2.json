@@ -1,0 +1,45 @@
+{
+  "summary": "Tested DiscKit (macOS desktop kit) end-to-end in the pod: /api/kit/info + /api/kit/download (zip layout, 755 bits, no __pycache__), CLI plan/build/verify on real knots.zim, folder source, website source (books.toscrape.com), Two-Drive Reader HTTP API + browser UI, and the /burn page KitSection. Core features all work: ZIM split is correct (Text: html/css/js/plain + 1138 redirects + 1737 titles; Media: 3587 images only (png/svg/webp); same set_id, roles text/media), verify passes, reader redirects/iframe main page/article/assets/redirect entries/search/random/404/io counters on both volumes all correct, UI search+Enter+suggestion click, Random, Home, monitor close/toggle all work, images render (37/40 loaded, 0 broken; remainder lazy). Folder + website sources split and serve correctly with root-relative link rewriting and directory listings. Found 4 robustness bugs around output-folder handling and website dedup (below). Burn page KitSection renders and download works. Light regression of web app: 9/9 after updating 2 stale assertions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "disckit build (volume.py VolumeWriter.__init__)", "issue": "Building into a NON-EMPTY folder that is not already a disc (e.g. contains x.txt) is accepted silently; stray files get included in SHA256SUMS and would be burned. Review requirement says it should error cleanly. Only folders containing DISCKIT.json/index.db are rejected."},
+      {"endpoint": "disckit build (cli.py)", "issue": "When the output folder already holds a disc, the CLI dumps a raw Python Traceback ending in FileExistsError (exit 1) instead of a one-line friendly message. Wrap build/plan/read/verify in try/except (FileExistsError, FileNotFoundError, RuntimeError, NotADirectoryError, DiscFullError, OSError) -> print 'Error: ...' and sys.exit(1). Same for 'read' when the port is busy."},
+      {"endpoint": "disckit build (builder.py build())", "issue": "Text VolumeWriter is created before the Media one; if media-out is rejected (already a disc), the text-out folder is left with an orphan index.db + packs/, so retrying with the same text-out then fails with 'already contains a disc'. Validate BOTH output folders (empty, distinct from each other and from the source) before creating either writer, or clean up on failure."},
+      {"endpoint": "disckit build website (sources/website.py)", "issue": "Dedup is by URL, not by disc key: 'https://books.toscrape.com/' and '.../index.html' both map to key 'index.html', so the page is fetched twice, consumes a --max-pages slot (max-pages 3 -> only 2 distinct pages archived) and DISCKIT.json entries=12 while index.db has 11 rows (INSERT OR REPLACE). Track seen keys (key_link()[0]) in addition to URLs, and only count entries on new keys."},
+      {"endpoint": "disckit website fonts", "issue": "Some keys keep a trailing '?' (e.g. 'static/oscar/fonts/fontawesome-webfont.eot?'), which browsers never request -> those entries are unreachable (IE-only .eot so low impact)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Reader shell.html", "issue": "Random, Disc monitor toggle, close (x), home brand, iframe and drive cards have no data-testid (only search has reader-search). Add data-testid=reader-random, reader-monitor-toggle, reader-monitor-close, reader-home, reader-drive-text/media.", "selector": "#random, #toggle, #close, #home, .drive", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reader", "issues": ["Search is prefix-only on titles (e.g. 'knot' does not find 'Trefoil knot'); acceptable but consider a LIKE '%q%' fallback when prefix results < limit", "Empty q to /_disckit/api/search returns 20 arbitrary titles (UI guards it, API does not)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_disckit.py", "/app/backend/tests/test_offline_wiki.py", "/app/test_reports/pytest/pytest_disckit.xml"],
+  "action_items": [
+    "Reject non-empty output folders (any visible file) in VolumeWriter/build with a clear message; also reject text-out == media-out and outputs inside the source folder",
+    "Pre-validate both output folders before creating any writer (avoid orphan index.db in text-out when media-out fails)",
+    "Catch expected exceptions in cli.main and print a friendly 'Error: ...' line instead of a traceback (build, read port-in-use, verify missing SHA256SUMS)",
+    "website.py: dedupe by disc key, not only URL, so '/' and '/index.html' are fetched once and max-pages counts distinct pages; keep DISCKIT.json entries consistent with index rows",
+    "Add data-testids to reader shell buttons (Random, Disc monitor, close, home)"
+  ],
+  "critical_code_review_comments": [
+    "volume.py: entries counter increments even when INSERT OR REPLACE overwrites an existing path -> metadata drift (seen with website source)",
+    "rules.py: SVG (1739 files / 7.2 MB for knots) goes to the Media Disc stored raw/uncompressed (compress=False for media); for full Wikipedia this wastes space - consider compressing compressible mimes on the media disc too",
+    "folder source adds titles for non-HTML files (p.name), so Reader 'Random' and search can return .png/.txt paths; consider titles only for html",
+    "gui.py is 506 lines - OK, but CLI and GUI duplicate source-option wiring; fine for MVP",
+    "/api/kit/download zips everything under /app/disckit (except __pycache__/.venv) - any stray build output or .DS_Store dropped there will ship to users; whitelist extensions or paths",
+    "install.command may pick Apple's /usr/bin/python3 (3.9, Tk 8.5 deprecated) - consider preferring python.org/Homebrew paths first"
+  ],
+  "updated_files": ["/app/backend/tests/test_disckit.py (new)", "/app/backend/tests/test_offline_wiki.py (relaxed 2 stale assertions: article count upper bound 25 and lead-image ratio, since archive grew to 207 via grow-archive; widened wikilink sample to 40)"],
+  "success_rate": {"backend": "75% of DiscKit tests (12/16; the 4 failures are the robustness bugs above); web app regression 9/9", "frontend": "100% (Burn KitSection + Reader UI flows)"},
+  "seed_data_creation": "None in Mongo. Temp builds under /tmp/kb, /tmp/fb, /tmp/wb, /tmp/disckit_pytest (pod-local only).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app && python -m pytest backend/tests/test_disckit.py -v -n0 (pytest.ini enables xdist; session fixtures need -n0). Tests download the kit from the public URL, unzip into /tmp/disckit_pytest, build zim from /tmp/zim/knots.zim, folder, and books.toscrape.com website, and spin reader servers on free ports. Expected failing until fixed: test_nonempty_folder_rejected, test_error_is_clean_no_traceback, test_media_conflict_leaves_no_orphan_text_disc, test_website_pages_dedup_by_key. GUI/burn (macOS only) not tested.",
+  "rca of the issue": "Non-empty folder: VolumeWriter only checks for DISCKIT.json/index.db. Orphan text disc: builder.build() constructs tw then mw; mw's FileExistsError propagates after tw already created index.db/packs. Website duplicate: WebsiteSource.items() 'seen' set stores absolute URLs; '/' and '/index.html' differ as URLs but key_link() maps both to 'index.html'. Traceback: cli.main has no exception handling."
+}

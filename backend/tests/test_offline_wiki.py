@@ -30,14 +30,14 @@ def test_articles_list(s):
     assert r.status_code == 200
     arts = r.json()
     assert isinstance(arts, list)
-    assert 15 <= len(arts) <= 25
+    assert len(arts) >= 15  # archive can grow via grow-archive
     for a in arts:
         assert a["slug"] and a["title"]
         assert "description" in a
         assert "size_bytes" in a
     # at least most should have lead_media_id
     with_lead = [a for a in arts if a.get("lead_media_id")]
-    assert len(with_lead) >= len(arts) - 2
+    assert len(with_lead) >= len(arts) * 0.5  # grown articles may lack a lead image
 
 
 # ---- Article detail ----
@@ -92,7 +92,7 @@ def test_media_404(s):
 def test_cross_article_linking(s):
     arts_r = s.get(f"{API}/articles", timeout=30).json()
     found_wikilink = False
-    for a in arts_r[:8]:
+    for a in arts_r[:40]:
         d = s.get(f"{API}/articles/{a['slug']}", timeout=30).json()
         html_all = d.get("lead_html", "") + "".join(sec.get("html", "") for sec in d.get("sections", []))
         if re.search(r'data-wikilink="[^"]+"', html_all):

@@ -49,7 +49,7 @@
 </head>
 <body>
 <header>
-  <div class="brand" id="home" title="Main page">
+  <div class="brand" id="home" data-testid="reader-home" title="Main page">
     <div class="globe">W</div>
     <div class="wordmark" id="wordmark">Archive<small>READ FROM TWO DISCS</small></div>
   </div>
@@ -57,13 +57,13 @@
     <input id="q" placeholder="Search the discs" autocomplete="off" data-testid="reader-search">
     <div class="suggest" id="sug"></div>
   </div>
-  <button class="btn" id="random">Random</button>
-  <button class="btn primary" id="toggle">Disc monitor</button>
+  <button class="btn" id="random" data-testid="reader-random">Random</button>
+  <button class="btn primary" id="toggle" data-testid="reader-monitor-toggle">Disc monitor</button>
 </header>
 <main>
-  <iframe id="view" title="Archive content"></iframe>
-  <aside id="mon">
-    <div class="mon-head"><h2>Disc I/O monitor</h2><button class="x" id="close" title="Close">&times;</button></div>
+  <iframe id="view" data-testid="reader-frame" title="Archive content"></iframe>
+  <aside id="mon" data-testid="reader-monitor">
+    <div class="mon-head"><h2>Disc I/O monitor</h2><button class="x" id="close" data-testid="reader-monitor-close" title="Close">&times;</button></div>
     <div id="warn"></div>
     <div id="drives"></div>
     <p class="note">Every article is read from the <b style="color:var(--text)">Text Disc</b> while its images stream from the <b style="color:var(--media)">Media Disc</b> &mdash; both drives work at the same time.</p>
@@ -81,7 +81,7 @@ const discSvg = (color) => `<svg class="disc" viewBox="0 0 40 40"><circle cx="20
 
 function driveCard(v, i) {
   const color = v.role === "text" ? "var(--text)" : "var(--media)";
-  return `<div class="drive" id="d${i}" style="color:${color}">
+  return `<div class="drive" id="d${i}" data-testid="reader-drive-${v.role}" style="color:${color}">
     <div class="drive-top">${discSvg(color)}<div><div class="dname" style="color:var(--ink)">Drive ${i + 1} &middot; ${v.role === "text" ? "Text Disc" : "Media Disc"}</div>
     <div class="dmeta">${v.label || ""} &middot; ${v.mount}</div></div><span class="led"></span></div>
     <div class="spark">${"<i></i>".repeat(48)}</div>

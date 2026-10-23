@@ -8,7 +8,7 @@ from . import __version__
 from .builder import Progress, build, plan
 from .rules import Rules
 from .sources import open_source
-from .volume import GB
+from .volume import GB, DiscFullError
 
 
 def _source(a):
@@ -31,6 +31,16 @@ def _add_source_args(p):
 
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except (OSError, ValueError, RuntimeError, DiscFullError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _main(argv=None):
     ap = argparse.ArgumentParser(prog="disckit", description=f"DiscKit {__version__}")
     sub = ap.add_subparsers(dest="cmd")
 

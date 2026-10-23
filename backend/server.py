@@ -854,12 +854,14 @@ async def burn_checksums():
 
 
 KIT_DIR = ROOT_DIR.parent / "disckit"
+KIT_SUFFIXES = {".py", ".html", ".md", ".txt", ".command"}
 
 
 def _kit_files():
     return sorted(
         p for p in KIT_DIR.rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts and ".venv" not in p.parts
+        if p.is_file() and p.suffix in KIT_SUFFIXES and not p.name.startswith(".")
+        and "__pycache__" not in p.parts and ".venv" not in p.parts
     )
 
 

@@ -74,13 +74,20 @@ def sha256_file(path, chunk=4 << 20):
     return h.hexdigest()
 
 
+def check_empty(root):
+    root = Path(root)
+    if root.exists() and not root.is_dir():
+        raise NotADirectoryError(f"{root} is not a folder")
+    if root.exists() and any(not p.name.startswith(".") for p in root.iterdir()):
+        raise FileExistsError(f"{root} is not empty. Choose an empty folder for each disc.")
+
+
 class VolumeWriter:
     def __init__(self, root, role, set_id, label, capacity_bytes, compress=True,
                  disc_index=1, disc_count=2):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-        if (self.root / "DISCKIT.json").exists() or (self.root / "index.db").exists():
-            raise FileExistsError(f"{self.root} already contains a disc. Choose an empty folder.")
+        check_empty(self.root)
         (self.root / "packs").mkdir(exist_ok=True)
         self.role, self.set_id, self.label = role, set_id, label
         self.capacity = int(capacity_bytes * FS_MARGIN)
@@ -174,6 +181,8 @@ class VolumeWriter:
         self.pack_f.close()
         self.db.execute("CREATE INDEX IF NOT EXISTS titles_key ON titles(key)")
         self.db.commit()
+        self.entries = self.db.execute("SELECT count(*) FROM entries").fetchone()[0]
+        self.redirects = self.db.execute("SELECT count(*) FROM redirects").fetchone()[0]
         self.db.close()
         info = {
             "format": FORMAT, "set_id": self.set_id, "role": self.role, "label": self.label,

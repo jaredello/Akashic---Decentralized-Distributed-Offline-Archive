@@ -55,6 +55,6 @@ class FolderSource(Source):
         for p in self._scan():
             rel = p.relative_to(self.root).as_posix()
             mime = guess_mime(rel)
-            title = (_html_title(p) or p.stem) if mime == "text/html" else p.name
+            title = (_html_title(p) or p.stem) if mime == "text/html" else None
             yield Item(path=rel, mime=mime, title=title, size=p.stat().st_size,
                        load=lambda p=p: p.read_bytes())
