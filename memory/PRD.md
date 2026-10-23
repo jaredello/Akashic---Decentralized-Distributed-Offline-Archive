@@ -94,3 +94,9 @@ Location: /app/disckit (downloadable zip via GET /api/kit/download, info at /api
 ## Backlog
 - P1 Multi-disc spanning (N discs, higher-res media)
 - P2 Full-text search on Text Disc; package as signed .app
+
+## Code review fixes (Jun 2026) — DONE (iteration_3, 100% frontend)
+- DOMPurify sanitizes article HTML; Article useEffect deps fixed; nested ternaries removed (Burn, KitSection); empty catches log warnings
+- Verified false positives: server.py `is` comparisons (all `is None`), `data` at server.py:333, DiskContext/Burn hook deps
+- Deferred: large refactors (split Burn.js / Portal.js / server.py _run_burn)
+- Open security audit items: SEC-001 rate-limit/cap /api/burn & /api/seed/expand; SEC-002 CORS allowlist

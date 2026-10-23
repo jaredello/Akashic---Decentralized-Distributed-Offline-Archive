@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend regression after code-review fixes (DOMPurify, useEffect deps, buildLabel, KitSection STEPS icons, console.warn catches). All requested flows pass: /wiki/Solar_System renders lead text, 12 h2 sections, 40 paragraphs, 5 images (infobox lead + inline, all loaded naturalWidth>0), no <script> in body; 7 [data-wikilink] anchors survive DOMPurify and clicking one navigates client-side to /wiki/Jupiter with exactly 1 /api/articles/Jupiter request and 0 extra requests over a 5s idle window (no re-render loop). TOC (12 links) click scrolls section to top (~80px, matches scroll-mt-20). Disk monitor Text Disk READ(SESSION) increments 60 KB -> 106 KB, I/O log shows T0 SEEK/READ and M1 media reads. Portal: 206 cards + featured, search 'Jupi' shows search-results with search-result-Jupiter, Enter navigates to /wiki/Jupiter. Burn: build-discs-btn shows 'Rebuild disc images' (export exists), enabled; 9 theme chips; kit-step-1..3 each render a coloured lucide icon. Zero console errors/warnings/page errors across all pages. Build/Grow not triggered per instructions, so 'Building…' label only verified by code review (Burn.js L135-136 correct).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Initial mount of /wiki/<slug> fires /api/articles/<slug> twice and logs 'SEEK' twice in the I/O log — this is React.StrictMode dev double-effect (index.js), first request is discarded via alive flag; not present in production builds. Client-side navigations fetch exactly once.",
+    "DiskContext value object (and toggleMonitor) is recreated every render; harmless since beginRead/endRead are stable useCallbacks, but useMemo on value would reduce consumer re-renders (status polls every 8s).",
+    "When StrictMode's first effect is cancelled, beginRead already set textActive=true and cleanup does not call endRead; second run's endRead resets it, so no visible issue."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Articles with most data-wikilink anchors: Solar_System(7), Jupiter(6), Volcano(4), Black_hole(3). Archive has 207 articles. Do not trigger build-discs-btn / grow-archive-btn (slow). Search input testid: search-input; results: search-result-<slug>.",
+  "rca of the issue": "N/A - no bugs found"
+}
