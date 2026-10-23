@@ -1,0 +1,18 @@
+{
+  "summary": "Tested the 'Signed Mac App' feature (signing-ready, unsigned fallback). Static checks pass: bash -n on build_app.sh and sign_notarize.sh, workflow YAML valid with all 5 secrets passed as env to the build step plus a 'Build summary' step, and entitlements.plist parses. Ran the stub harness with X.app made from /root/pyi output plus a fake Mach-O fake.dylib. With Accepted it prints 'disabled without secrets: OK', 'enabled with secrets: OK' and IDENTITY='Developer ID Application: Test Person (TEAM123456)'. fake.dylib was signed with --timestamp --options runtime --entitlements (the Linux ELF files were correctly skipped as not Mach-O), followed by the bundle sign, codesign --verify, ditto zip, notarytool submit --key/--key-id K1/--issuer I1, stapler staple, stapler validate, spctl assess and NOTARIZE_OK. The keychain is deleted and cert.p12/AuthKey.p8 are removed from build/. With FAKE_STATUS=Invalid it exits 1, calls 'notarytool log 1111-2222', skips stapler and still cleans up the temp secret files. Code review of build_app.sh confirms the unsigned fallback (ad-hoc 'codesign --force --deep --sign -', '-unsigned' dmg suffix, FIRST_LAUNCH.txt) and the signed path (FIRST_LAUNCH_SIGNED.txt, dmg codesign + notarize + staple + spctl). SIGNING.md covers every required topic. Backend: /api/kit/info app has signing_ready:true and signing_guide 'packaging/macos/SIGNING.md'. The kit zip has sign_notarize.sh at 0755 plus entitlements.plist, SIGNING.md and FIRST_LAUNCH_SIGNED.txt. Frontend /burn: kit-signing-note shows inside kit-app-option and mentions SIGNING.md. kit-dmg-steps, kit-download-btn (download works: DiscKit-macOS.zip) and kit-meta (v1.1.0 · 29 files · 900 KB) are unchanged. 41/41 pytest pass (new signing tests plus the fulltext regression).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_disckit_signing.py", "/app/backend/tests/test_disckit_fulltext.py", "/app/test_reports/pytest/pytest_signing.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "sign_notarize.sh notarize(): out=$(xcrun notarytool submit ...) runs under set -e. If notarytool exits non-zero (auth error, timeout, or possibly an Invalid verdict, depending on the Xcode version), the script stops before it prints '::error::' and before 'notarytool log'. Optional hardening: append '|| true' to the submit and let the status check handle the failure.",
+    "setup_keychain installs 'trap cleanup_signing EXIT', which overwrites any earlier EXIT trap in build_app.sh. There is none today; keep in mind if one is added later.",
+    "Entitlements are applied to every Mach-O, including dylibs. This is harmless, though they only take effect on the main executable."
+  ],
+  "updated_files": ["/app/backend/tests/test_disckit_signing.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Recreated /root/signtest/X.app from /root/pyi/dist/DiscKit plus a fake Mach-O at Contents/Frameworks/fake.dylib (the test does this automatically).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Real signing/notarization cannot run on Linux; test_disckit_signing.py drives /root/signtest/t.sh with the stubbed macOS tools (FAKE_STATUS env switches the notary verdict). Run it with REACT_APP_BACKEND_URL exported."
+}

@@ -106,3 +106,10 @@ Location: /app/disckit (downloadable zip via GET /api/kit/download, info at /api
 - Mac App Bundle: packaging/macos/{build_app.sh (PyInstaller, iconutil icns, ad-hoc codesign, dmg), launcher.py, icon.png, FIRST_LAUNCH.txt}; GitHub Actions /app/.github/workflows/disckit-macos.yml (macos-14 arm64, smoke test on ray-charles ZIM, artifact + release on tag disckit-v*); unsigned
 - Web: KitSection shows DiscKit.app option (icon /disckit-icon.png, GitHub steps or DISCKIT_DMG_URL button) + source kit zip
 - Frozen app validated on Linux PyInstaller stand-in (/root/pyi); real mac build happens on GitHub after Save to GitHub
+
+## Signing-ready Mac app (Jun 2026) — DONE (iteration_6, 41/41 pytest)
+- User has no Apple Developer membership yet → builds stay UNSIGNED (ad-hoc, dmg suffix -unsigned) until 5 GitHub secrets exist
+- packaging/macos/sign_notarize.sh: temp keychain import of Developer ID .p12, sign every Mach-O + frameworks + bundle (hardened runtime, entitlements.plist), notarytool (App Store Connect API key) submit --wait, staple app + dmg (works offline), spctl checks, prints Apple log on failure, cleans secrets
+- Secrets (GitHub repo → Actions secrets): MACOS_CERT_P12_BASE64, MACOS_CERT_PASSWORD, ASC_API_KEY_P8_BASE64, ASC_API_KEY_ID, ASC_API_ISSUER_ID
+- Guide: packaging/macos/SIGNING.md; KitSection shows kit-signing-note; /api/kit/info app.signing_ready
+- Stub harness for signing logic: /root/signtest (t.sh + bin stubs)
