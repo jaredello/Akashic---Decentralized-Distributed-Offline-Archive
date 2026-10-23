@@ -22,7 +22,7 @@ export const DiskProvider = ({ children }) => {
       const { data } = await http.get("/disks/status");
       setStatus(data);
     } catch (e) {
-      /* offline is fine */
+      console.warn("disk status unavailable", e);
     }
   }, []);
 

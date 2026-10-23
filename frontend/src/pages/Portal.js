@@ -46,7 +46,7 @@ export default function Portal() {
       const data = await load();
       if (data.length === 0) {
         // kick off seeding and poll
-        try { await http.post("/seed"); } catch (e) {}
+        try { await http.post("/seed"); } catch (e) { console.warn("seed request failed", e); }
         iv = setInterval(async () => {
           const { data: st } = await http.get("/seed/status");
           setSeed(st);

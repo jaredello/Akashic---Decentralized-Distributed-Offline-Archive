@@ -99,7 +99,7 @@ export default function Burn() {
   useEffect(() => {
     loadBurn();
     http.get("/seed/status").then(({ data }) => setSeed(data));
-    http.get("/seed/themes").then(({ data }) => setThemes(data)).catch(() => {});
+    http.get("/seed/themes").then(({ data }) => setThemes(data)).catch((e) => console.warn("themes unavailable", e));
     return () => {
       clearInterval(seedPoll.current);
       clearInterval(burnPoll.current);
@@ -132,6 +132,8 @@ export default function Burn() {
   const burnPct = burn?.total ? Math.round((burn.progress / burn.total) * 100) : 0;
   const cap = status?.capacity;
   const overCapacity = cap && (cap.text.over_capacity || cap.media.over_capacity || cap.largest_media_over_disc);
+  let buildLabel = exportRec ? "Rebuild disc images" : "Build disc images";
+  if (burnRunning) buildLabel = "Building…";
   const previewUrl = `${API}/preview/index.html`;
   const openPreview = () => window.open(previewUrl, "_blank", "noopener");
 
@@ -304,7 +306,7 @@ export default function Burn() {
           className="flex items-center gap-2 h-10 px-5 rounded-sm bg-[#202122] text-white text-sm font-semibold hover:bg-black disabled:opacity-50 transition-colors"
         >
           {burnRunning ? <Loader2 size={16} className="animate-spin" /> : <Disc3 size={16} />}
-          {burnRunning ? "Building…" : exportRec ? "Rebuild disc images" : "Build disc images"}
+          {buildLabel}
         </button>
 
         {burnRunning && (

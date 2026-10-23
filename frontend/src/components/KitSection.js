@@ -3,9 +3,9 @@ import { Laptop, Download, FileArchive, FolderOpen, Globe, Disc3, BookOpen } fro
 import { http, API, fmtBytes } from "@/lib/api";
 
 const STEPS = [
-  { icon: FileArchive, title: "Build", body: "Pick a Kiwix .zim (e.g. full English Wikipedia), a folder, or a website. DiscKit splits it into a Text Disc and a Media Disc." },
-  { icon: Disc3, title: "Burn", body: "Detect both M-DISC drives and burn the two discs at the same time, with checksums verified." },
-  { icon: BookOpen, title: "Read", body: "Insert both discs and read in your browser: articles come from drive 1, images stream from drive 2." },
+  { icon: FileArchive, color: "#15803d", title: "Build", body: "Pick a Kiwix .zim (e.g. full English Wikipedia), a folder, or a website. DiscKit splits it into a Text Disc and a Media Disc." },
+  { icon: Disc3, color: "#202122", title: "Burn", body: "Detect both M-DISC drives and burn the two discs at the same time, with checksums verified." },
+  { icon: BookOpen, color: "#b45309", title: "Read", body: "Insert both discs and read in your browser: articles come from drive 1, images stream from drive 2." },
 ];
 
 const SOURCES = [
@@ -17,7 +17,7 @@ const SOURCES = [
 export const KitSection = () => {
   const [info, setInfo] = useState(null);
   useEffect(() => {
-    http.get("/kit/info").then(({ data }) => setInfo(data)).catch(() => {});
+    http.get("/kit/info").then(({ data }) => setInfo(data)).catch((e) => console.warn("kit info unavailable", e));
   }, []);
 
   return (
@@ -44,7 +44,7 @@ export const KitSection = () => {
           <div key={s.title} className="p-4" data-testid={`kit-step-${i + 1}`}>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="mono text-[10px] text-[#72777d]">0{i + 1}</span>
-              <s.icon size={15} className={i === 0 ? "text-[#15803d]" : i === 1 ? "text-[#202122]" : "text-[#b45309]"} />
+              <s.icon size={15} style={{ color: s.color }} />
               <span className="wiki-serif text-base">{s.title}</span>
             </div>
             <p className="text-xs text-[#54595d] leading-relaxed">{s.body}</p>

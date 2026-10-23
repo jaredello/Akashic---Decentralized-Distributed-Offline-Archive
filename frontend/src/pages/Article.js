@@ -4,6 +4,9 @@ import { FileText, WifiOff, Loader2, ArrowLeft } from "lucide-react";
 import { http, fmtBytes } from "@/lib/api";
 import { MediaImage } from "@/components/MediaImage";
 import { useDisks } from "@/context/DiskContext";
+import DOMPurify from "dompurify";
+
+const clean = (html) => ({ __html: DOMPurify.sanitize(html || "") });
 
 export default function Article() {
   const { slug } = useParams();
@@ -37,8 +40,7 @@ export default function Article() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [slug, beginRead, endRead]);
 
   const onBodyClick = useCallback(
     (e) => {
@@ -132,7 +134,7 @@ export default function Article() {
       )}
 
       <div ref={bodyRef} onClick={onBodyClick} className="article-body">
-        <div dangerouslySetInnerHTML={{ __html: article.lead_html }} />
+        <div dangerouslySetInnerHTML={clean(article.lead_html)} />
 
         {article.sections.map((s, i) => (
           <section key={s.anchor} id={s.anchor} className="scroll-mt-20">
@@ -147,7 +149,7 @@ export default function Article() {
                 className="md:float-right w-full md:w-56 md:ml-5 mb-3"
               />
             )}
-            <div dangerouslySetInnerHTML={{ __html: s.html }} />
+            <div dangerouslySetInnerHTML={clean(s.html)} />
           </section>
         ))}
         <div className="clear-both" />
