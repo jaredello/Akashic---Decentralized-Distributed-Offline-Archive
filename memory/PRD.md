@@ -74,3 +74,10 @@ entirely offline — hosting the site from the discs instead of the internet.
 - **Combined Preview**: `/api/preview/*` serves the generated Text + Media disc content together
   (index.html, per-article pages, assets, media) so the offline site is browsable before burning.
   "Preview" buttons open it in a new tab. Verified index + article render with images loaded.
+
+## Roadmap update (Jun 2026) – Full English Wikipedia goal
+- User confirmed: explanation only for now, no code changes.
+- Target: English Wikipedia; Media Disk = Kiwix-style WebP thumbnails (~55-60 GB); Text Disk = all articles + references (~50-60 GB, nopic).
+- Blockers in current app: live API crawling too slow (use Wikimedia/Kiwix dumps), cloud pod can't hold 100GB+, ISO9660 -> need UDF for BDXL, full-res images, browser download of 100GB ISO impractical.
+- Future (P1): local CLI pipeline (dump -> text disc + media disc), offline two-drive reader, UDF image builder, capacity planner for full dump.
+- Future (P2): multi-disc spanning (higher-res media across N discs); generalize the dual/multi-disc system for other applications (not just Wikipedia).
