@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiscKit Reader</title>
+<style>
+  :root { --text:#15803d; --media:#b45309; --line:#a2a9b1; --soft:#eaecf0; --ink:#202122; --link:#3366cc; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color:var(--ink); }
+  body { display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:18px; padding:10px 18px; border-bottom:1px solid var(--line); background:#fff; position:relative; z-index:3; }
+  .brand { display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+  .globe { width:40px; height:40px; border-radius:50%; border:1px solid var(--line); display:grid; place-items:center; font-family: "Linux Libertine", Georgia, "Times New Roman", serif; font-size:24px; background:radial-gradient(circle at 30% 30%, #fff, #e8eaed); }
+  .wordmark { font-family: "Linux Libertine", Georgia, "Times New Roman", serif; font-size:21px; letter-spacing:.02em; line-height:1; }
+  .wordmark small { display:block; font-family: inherit; font-size:11px; color:#54595d; letter-spacing:.04em; margin-top:3px; }
+  .search { position:relative; flex:1; max-width:560px; }
+  .search input { width:100%; height:34px; border:1px solid var(--line); border-radius:2px; padding:0 12px; font-size:14px; outline:none; transition:border-color .15s, box-shadow .15s; }
+  .search input:focus { border-color:var(--link); box-shadow: inset 0 0 0 1px var(--link); }
+  .suggest { position:absolute; top:36px; left:0; right:0; background:#fff; border:1px solid var(--line); display:none; max-height:360px; overflow:auto; box-shadow:0 4px 14px rgba(0,0,0,.08); }
+  .suggest a { display:block; padding:7px 12px; font-size:14px; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--soft); }
+  .suggest a:hover, .suggest a.on { background:#eaf3ff; }
+  .btn { height:32px; padding:0 12px; border:1px solid var(--line); background:#f8f9fa; border-radius:2px; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer; transition:background-color .15s; }
+  .btn:hover { background:#fff; }
+  .btn.primary { background:var(--link); border-color:var(--link); color:#fff; }
+  main { flex:1; display:flex; min-height:0; }
+  iframe { flex:1; border:0; min-width:0; background:#fff; }
+  aside { width:310px; border-left:1px solid var(--line); background:#f8f9fa; overflow:auto; transition: margin-right .25s ease; }
+  aside.closed { margin-right:-311px; }
+  .mon-head { display:flex; justify-content:space-between; align-items:center; padding:14px 16px 10px; border-bottom:1px solid var(--soft); }
+  .mon-head h2 { margin:0; font-family: Georgia, serif; font-weight:normal; font-size:17px; }
+  .x { background:none; border:0; font-size:18px; cursor:pointer; color:#54595d; }
+  .drive { margin:12px; background:#fff; border:1px solid #c8ccd1; border-radius:2px; padding:12px; }
+  .drive-top { display:flex; align-items:center; gap:10px; }
+  .disc { width:34px; height:34px; flex:none; }
+  .disc.spin { animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .dname { font-family: Georgia, serif; font-size:15px; }
+  .dmeta { font-family: ui-monospace, Menlo, monospace; font-size:10px; color:#72777d; word-break:break-all; }
+  .led { margin-left:auto; width:10px; height:10px; border-radius:50%; background:#c8ccd1; transition: background-color .1s, box-shadow .1s; }
+  .spark { display:flex; align-items:flex-end; gap:1px; height:38px; margin:10px 0 8px; border-bottom:1px solid var(--soft); }
+  .spark i { flex:1; background:currentColor; opacity:.75; min-height:1px; }
+  dl { margin:0; display:grid; grid-template-columns: 1fr auto; gap:3px 8px; font-size:12px; }
+  dt { color:#54595d; } dd { margin:0; font-family: ui-monospace, Menlo, monospace; text-align:right; }
+  .last { margin-top:8px; font-family: ui-monospace, Menlo, monospace; font-size:10px; color:#54595d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .note { margin:12px; font-size:11px; color:#72777d; line-height:1.5; }
+  .warn { margin:12px; padding:8px 10px; font-size:12px; background:#fdeaea; border:1px solid #f3b5b5; color:#b32424; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand" id="home" title="Main page">
+    <div class="globe">W</div>
+    <div class="wordmark" id="wordmark">Archive<small>READ FROM TWO DISCS</small></div>
+  </div>
+  <div class="search">
+    <input id="q" placeholder="Search the discs" autocomplete="off" data-testid="reader-search">
+    <div class="suggest" id="sug"></div>
+  </div>
+  <button class="btn" id="random">Random</button>
+  <button class="btn primary" id="toggle">Disc monitor</button>
+</header>
+<main>
+  <iframe id="view" title="Archive content"></iframe>
+  <aside id="mon">
+    <div class="mon-head"><h2>Disc I/O monitor</h2><button class="x" id="close" title="Close">&times;</button></div>
+    <div id="warn"></div>
+    <div id="drives"></div>
+    <p class="note">Every article is read from the <b style="color:var(--text)">Text Disc</b> while its images stream from the <b style="color:var(--media)">Media Disc</b> &mdash; both drives work at the same time.</p>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const view = $("view"), mon = $("mon");
+let info = null, hist = {};
+const fmt = (b) => { if (!b) return "0 B"; const u = ["B","KB","MB","GB","TB"]; let i = 0; while (b >= 1000 && i < 4) { b /= 1000; i++; } return b.toFixed(i ? 1 : 0) + " " + u[i]; };
+const enc = (p) => "/" + p.split("/").map(encodeURIComponent).join("/");
+const go = (p) => { view.src = enc(p); };
+
+const discSvg = (color) => `<svg class="disc" viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="${color}" opacity=".14" stroke="${color}"/><circle cx="20" cy="20" r="13" fill="none" stroke="${color}" stroke-dasharray="3 5" opacity=".6"/><path d="M20 1 A19 19 0 0 1 39 20" stroke="${color}" stroke-width="2" fill="none"/><circle cx="20" cy="20" r="4" fill="#fff" stroke="${color}"/></svg>`;
+
+function driveCard(v, i) {
+  const color = v.role === "text" ? "var(--text)" : "var(--media)";
+  return `<div class="drive" id="d${i}" style="color:${color}">
+    <div class="drive-top">${discSvg(color)}<div><div class="dname" style="color:var(--ink)">Drive ${i + 1} &middot; ${v.role === "text" ? "Text Disc" : "Media Disc"}</div>
+    <div class="dmeta">${v.label || ""} &middot; ${v.mount}</div></div><span class="led"></span></div>
+    <div class="spark">${"<i></i>".repeat(48)}</div>
+    <dl style="color:var(--ink)"><dt>Throughput</dt><dd class="tp">0 B/s</dd><dt>Reads</dt><dd class="rd">0</dd>
+    <dt>Read from disc</dt><dd class="by">0 B</dd><dt>Cache hits</dt><dd class="ch">0</dd><dt>On disc</dt><dd>${fmt(v.disc_bytes)}</dd></dl>
+    <div class="last">&mdash;</div></div>`;
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/_disckit/api/io", { cache: "no-store" });
+    const { volumes } = await r.json();
+    if (!$("drives").children.length) $("drives").innerHTML = volumes.map(driveCard).join("");
+    volumes.forEach((v, i) => {
+      const el = $("d" + i); if (!el) return;
+      const h = (hist[i] = hist[i] || []);
+      h.push(v.throughput_bps); if (h.length > 48) h.shift();
+      const max = Math.max(...h, 1);
+      el.querySelectorAll(".spark i").forEach((bar, k) => { const val = h[k - (48 - h.length)] || 0; bar.style.height = (val / max * 100) + "%"; });
+      el.querySelector(".tp").textContent = fmt(v.throughput_bps) + "/s";
+      el.querySelector(".rd").textContent = v.reads.toLocaleString();
+      el.querySelector(".by").textContent = fmt(v.bytes_read);
+      el.querySelector(".ch").textContent = v.cache_hits.toLocaleString();
+      el.querySelector(".last").textContent = v.last_path || "—";
+      const led = el.querySelector(".led");
+      led.style.background = v.active ? "currentColor" : "#c8ccd1";
+      led.style.boxShadow = v.active ? "0 0 8px currentColor" : "none";
+      el.querySelector(".disc").classList.toggle("spin", v.active);
+    });
+  } catch (e) {}
+  setTimeout(poll, 400);
+}
+
+view.addEventListener("load", () => {
+  try {
+    const p = decodeURIComponent(view.contentWindow.location.pathname.slice(1));
+    const s = view.contentWindow.location.search;
+    history_replace(p + s);
+    document.title = (view.contentDocument.title || p) + " — " + (info ? info.title : "DiscKit");
+  } catch (e) {}
+});
+function history_replace(p) { window.history.replaceState(null, "", "#/" + p); }
+
+let sel = -1, items = [];
+$("q").addEventListener("input", async (e) => {
+  const q = e.target.value.trim();
+  if (!q) { $("sug").style.display = "none"; return; }
+  const r = await fetch("/_disckit/api/search?q=" + encodeURIComponent(q));
+  items = await r.json(); sel = -1;
+  $("sug").innerHTML = items.map((it, i) => `<a href="#" data-i="${i}">${it.title.replace(/</g, "&lt;")}</a>`).join("") || '<a href="#" style="color:#72777d">No matches on these discs</a>';
+  $("sug").style.display = "block";
+});
+$("sug").addEventListener("mousedown", (e) => { const a = e.target.closest("a"); if (a && a.dataset.i) { pick(+a.dataset.i); } e.preventDefault(); });
+$("q").addEventListener("keydown", (e) => {
+  const links = [...$("sug").querySelectorAll("a[data-i]")];
+  if (e.key === "ArrowDown") { sel = Math.min(sel + 1, links.length - 1); }
+  else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); }
+  else if (e.key === "Enter") { pick(sel >= 0 ? sel : 0); return; }
+  else if (e.key === "Escape") { $("sug").style.display = "none"; return; }
+  else return;
+  links.forEach((l, i) => l.classList.toggle("on", i === sel)); e.preventDefault();
+});
+$("q").addEventListener("blur", () => setTimeout(() => ($("sug").style.display = "none"), 150));
+function pick(i) { if (!items[i]) return; go(items[i].path); $("q").value = ""; $("sug").style.display = "none"; }
+
+$("home").onclick = () => go(info ? info.main_path : "");
+$("random").onclick = async () => { const r = await (await fetch("/_disckit/api/random")).json(); go(r.path); };
+$("toggle").onclick = () => mon.classList.toggle("closed");
+$("close").onclick = () => mon.classList.add("closed");
+
+(async () => {
+  if (window.top !== window) { location.replace("/"); return; }
+  info = await (await fetch("/_disckit/api/info")).json();
+  $("wordmark").firstChild.textContent = info.title;
+  if (info.set_mismatch) $("warn").innerHTML = '<div class="warn">These discs come from different builds. Pages may be missing images.</div>';
+  const start = decodeURIComponent(location.hash.replace(/^#\//, ""));
+  if (start) view.src = enc(start.split("?")[0]) + (start.includes("?") ? "?" + start.split("?").slice(1).join("?") : "");
+  else go(info.main_path);
+  poll();
+})();
+</script>
+</body>
+</html>

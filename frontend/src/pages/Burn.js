@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { http, API, fmtBytes } from "@/lib/api";
 import { useDisks } from "@/context/DiskContext";
+import { KitSection } from "@/components/KitSection";
 
 const DISC_TOTAL = 100 * 1000 * 1000 * 1000;
 
@@ -174,6 +175,8 @@ export default function Burn() {
       <p className="text-xs text-[#72777d] mt-1.5">
         Opens the exact Text + Media disc content in a new tab — test-browse it before you burn.
       </p>
+
+      <KitSection />
 
       {/* Capacity Planner */}
       <section className="mt-8 border border-[#c8ccd1] rounded-sm p-5" data-testid="capacity-planner">

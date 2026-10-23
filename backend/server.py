@@ -6,6 +6,7 @@ import json
 import uuid
 import html
 import hashlib
+import zipfile
 import asyncio
 import logging
 from collections import Counter
@@ -850,6 +851,47 @@ async def burn_checksums():
         "\n".join(lines),
         headers={"Content-Disposition": 'attachment; filename="SHA256SUMS"'},
     )
+
+
+KIT_DIR = ROOT_DIR.parent / "disckit"
+
+
+def _kit_files():
+    return sorted(
+        p for p in KIT_DIR.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts and ".venv" not in p.parts
+    )
+
+
+@api_router.get("/kit/info")
+async def kit_info():
+    version = re.search(r'__version__ = "([^"]+)"', (KIT_DIR / "disckit" / "__init__.py").read_text()).group(1)
+    files = _kit_files()
+    return {
+        "version": version,
+        "platform": "macOS",
+        "file_count": len(files),
+        "size_bytes": sum(p.stat().st_size for p in files),
+        "sources": ["zim", "folder", "website"],
+    }
+
+
+@api_router.get("/kit/download")
+async def kit_download():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in _kit_files():
+            info = zipfile.ZipInfo(f"DiscKit/{p.relative_to(KIT_DIR).as_posix()}", time.localtime(p.stat().st_mtime)[:6])
+            info.compress_type = zipfile.ZIP_DEFLATED
+            mode = 0o755 if p.suffix == ".command" else 0o644
+            info.external_attr = (0o100000 | mode) << 16
+            zf.writestr(info, p.read_bytes())
+    return Response(
+        buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="DiscKit-macOS.zip"'},
+    )
+
 
 
 @api_router.get("/articles")

@@ -1,0 +1,2 @@
+libzim>=3.4
+zstandard>=0.22
