@@ -108,7 +108,7 @@ async function fulltext(q, page = 0) {
   const count = r.total >= 1000 ? "1,000+" : r.total.toLocaleString();
   const more = r.more ? `<button class="btn" id="ftmore" data-testid="reader-results-more">More results</button>` : "";
   if (page === 0) {
-    box.innerHTML = `<h1>Search results</h1><div class="meta" data-testid="reader-results-count">${count} article${r.total === 1 ? "" : "s"} contain <b>${esc(r.terms.join(" "))}</b> &middot; best matches first &middot; <a href="#" id="ftclose" style="color:var(--link)">back to reading</a></div><div id="fthits">${hits || '<p class="meta">No article on these discs contains every one of those words.</p>'}</div><div id="ftfoot">${more}</div>`;
+    box.innerHTML = `<h1>Search results</h1><div class="meta" data-testid="reader-results-count">${count} ${r.total === 1 ? "article contains" : "articles contain"} <b>${esc(r.terms.join(" "))}</b> &middot; best matches first &middot; <a href="#" id="ftclose" style="color:var(--link)">back to reading</a></div><div id="fthits">${hits || '<p class="meta">No article on these discs contains every one of those words.</p>'}</div><div id="ftfoot">${more}</div>`;
     $("ftclose").onclick = (e) => { e.preventDefault(); box.classList.remove("open"); };
   } else {
     $("fthits").insertAdjacentHTML("beforeend", hits);

@@ -192,6 +192,7 @@ class VolumeWriter:
         self.pack_f.close()
         self.db.execute("CREATE INDEX IF NOT EXISTS titles_key ON titles(key)")
         if self.fulltext:
+            self.db.execute("CREATE INDEX IF NOT EXISTS docs_path ON docs(path)")
             self.db.execute("INSERT INTO fts(fts) VALUES('optimize')")
         self.db.commit()
         self.entries = self.db.execute("SELECT count(*) FROM entries").fetchone()[0]
@@ -274,13 +275,19 @@ class Volume:
         if not q or not self.has_fulltext:
             return 0, []
         db = self._db()
-        phrase = " ".join(terms)
-        rows = db.execute(
-            "SELECT d.path, d.title FROM (SELECT rowid, bm25(fts, 8.0, 1.0) AS r FROM fts WHERE fts MATCH ?) f "
-            "JOIN docs d ON d.id = f.rowid "
-            "ORDER BY lower(d.title) = ? DESC, f.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?) DESC, "
-            "f.r LIMIT ? OFFSET ?",
-            (q, phrase, "title : (" + q + ")", limit, offset)).fetchall()
+        # The article whose title is exactly the query always comes first.
+        exact = db.execute(
+            "SELECT d.id, d.path, d.title FROM titles t JOIN docs d ON d.path = t.path WHERE t.key = ? LIMIT 1",
+            (" ".join(terms),)).fetchone()
+        ranked = db.execute(
+            "SELECT d.id, d.path, d.title FROM (SELECT rowid, bm25(fts, 10.0, 1.0) AS r FROM fts "
+            "WHERE fts MATCH ? ORDER BY r LIMIT ? OFFSET ?) f JOIN docs d ON d.id = f.rowid ORDER BY f.r",
+            (q, limit + 1, offset)).fetchall()
+        if exact:
+            ranked = [r for r in ranked if r[0] != exact[0]]
+            if offset == 0:
+                ranked.insert(0, exact)
+        rows = [(p, t) for _, p, t in ranked[:limit]]
         total = db.execute("SELECT count(*) FROM (SELECT rowid FROM fts WHERE fts MATCH ? LIMIT 1000)",
                            (q,)).fetchone()[0]
         return total, rows

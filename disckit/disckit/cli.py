@@ -11,6 +11,10 @@ from .sources import open_source
 from .volume import GB, DiscFullError
 
 
+def _size(b):
+    return f"{b / GB:.2f} GB" if b >= GB / 10 else f"{b / 1e6:.1f} MB"
+
+
 def _source(a):
     opts = {}
     if a.source == "website":
@@ -79,10 +83,10 @@ def _main(argv=None):
             print(r["note"]); return
         for role in ("text", "media"):
             d = r[role]
-            print(f"{role.title():5} Disc: {d['items']:>10,} items  ~{d['est_bytes'] / GB:8.2f} GB  "
+            print(f"{role.title():5} Disc: {d['items']:>10,} items  ~{_size(d['est_bytes']):>9}  "
                   f"({d['fill_pct']:5.1f}% of {a.disc_gb} GB)  {'fits' if d['fits'] else 'DOES NOT FIT'}")
         print(f"Redirects: {r['redirects']:,}   skipped: {r['skipped']:,}   "
-              f"search index: ~{r['text']['fulltext_bytes'] / GB:.2f} GB (included in Text Disc)")
+              f"search index: ~{_size(r['text']['fulltext_bytes'])} (included in Text Disc)")
         return
 
     if a.cmd == "build":

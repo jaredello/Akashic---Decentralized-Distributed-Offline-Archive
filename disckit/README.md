@@ -40,7 +40,7 @@ What goes where (automatic, by file type):
 | HTML articles + references, CSS, JavaScript, redirects, search index | images (WebP/JPEG/PNG/GIF), SVG, audio, video, fonts, PDFs |
 
 **Full-text search** (on by default): every word of every article is indexed on the Text Disc
-(SQLite FTS5). For full English Wikipedia that adds roughly 12–18 GB — *Plan capacity* measures it for your file.
+(SQLite FTS5). For full English Wikipedia that adds roughly 15–25 GB — *Plan capacity* measures it for your file.
 Text is compressed in 1 MB clusters with zstd. Each disc gets `DISCKIT.json`, `index.db`,
 `packs/pack-NNNNN.bin` (≤ 1 GB each) and a `SHA256SUMS` file.
 

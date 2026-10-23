@@ -108,7 +108,7 @@ export const KitSection = () => {
       <p className="px-5 py-4 border-t border-[#eaecf0] text-xs text-[#72777d]">
         Get the newest <span className="mono">wikipedia_en_all_maxi</span> file (about 110 GB) from{" "}
         <a className="text-[#3366cc] hover:underline" href="https://download.kiwix.org/zim/wikipedia/" target="_blank" rel="noreferrer">download.kiwix.org</a>.
-        With full-text search switched on, the index adds roughly 12–18 GB to the Text Disc.
+        With full-text search switched on, the index adds roughly 15–25 GB to the Text Disc.
       </p>
     </section>
   );

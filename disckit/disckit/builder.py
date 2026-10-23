@@ -68,7 +68,7 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None, fulltext=Tru
     count = {TEXT: 0, MEDIA: 0}
     redirects = skipped = 0
     sample, sample_raw = [], 0
-    ft_sample, ft_raw = [], 0
+    ft_sample, ft_raw, ft_sample_bytes = [], 0, 0
     for it in source.items():
         if cancel and cancel.is_set():
             break
@@ -83,8 +83,9 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None, fulltext=Tru
         count[role] += 1
         if role == TEXT and fulltext and base_mime(it.mime) in FT_MIMES:
             ft_raw += it.size
-            if len(ft_sample) < 200 and it.load:
+            if len(ft_sample) < 1000 and ft_sample_bytes < 30_000_000 and it.load:
                 ft_sample.append((it.mime, it.load()))
+                ft_sample_bytes += len(ft_sample[-1][1])
         if role == TEXT and rules.compressible(it.mime) and len(sample) < sample_limit and it.load:
             data = it.load()
             sample.append(data)

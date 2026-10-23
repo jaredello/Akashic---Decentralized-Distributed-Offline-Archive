@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="25" time="3.533" timestamp="2026-10-23T04:20:18.306595+00:00" hostname="agent-env-5fc3d713-5beb-4977-9f2b-f637800833c2"><testcase classname="tests.test_disckit_fulltext" name="test_build_meta_fulltext" time="1.332" /><testcase classname="tests.test_disckit_fulltext" name="test_build_no_fulltext" time="0.876" /><testcase classname="tests.test_disckit_fulltext" name="test_info" time="0.002" /><testcase classname="tests.test_disckit_fulltext" name="test_bowline_first" time="0.021" /><testcase classname="tests.test_disckit_fulltext" name="test_multiword_requires_all" time="0.039" /><testcase classname="tests.test_disckit_fulltext" name="test_prefix_last_word" time="0.015" /><testcase classname="tests.test_disckit_fulltext" name="test_paging" time="0.028" /><testcase classname="tests.test_disckit_fulltext" name="test_empty_query" time="0.002" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[&quot;'*()-]" time="0.001" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[NOT]" time="0.009" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[a OR b]" time="0.016" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[title:x]" time="0.015" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[^]" time="0.002" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[AND OR NOT]" time="0.013" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[']" time="0.001" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[&quot;]" time="0.002" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[*]" time="0.001" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[a&quot;b]" time="0.016" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[NEAR(a b)]" time="0.017" /><testcase classname="tests.test_disckit_fulltext" name="test_special_chars_no_500[\u65e5\u672c]" time="0.002" /><testcase classname="tests.test_disckit_fulltext" name="test_bad_page_param" time="0.005"><failure message="requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))">/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:793: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:540: in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:638: in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:1443: in getresponse
+    response.begin()
+/usr/local/lib/python3.11/http/client.py:337: in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:306: in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+E   http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:847: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:510: in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/util/util.py:38: in reraise
+    raise value.with_traceback(tb)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:793: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:540: in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:638: in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:1443: in getresponse
+    response.begin()
+/usr/local/lib/python3.11/http/client.py:337: in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:306: in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+E   urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_disckit_fulltext.py:152: in test_bad_page_param
+    r = requests.get(ft_reader[1] + "/_disckit/api/fulltext", params={"q": "knot", "page": "abc"})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:87: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:71: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:711: in send
+    raise ConnectionError(err, request=request)
+E   requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))</failure></testcase><testcase classname="tests.test_disckit_fulltext" name="test_negative_page" time="0.013" /><testcase classname="tests.test_disckit_fulltext" name="test_shell_served" time="0.001" /><testcase classname="tests.test_disckit_fulltext" name="test_kit_info" time="0.296" /><testcase classname="tests.test_disckit_fulltext" name="test_kit_download_zip" time="0.188" /></testsuite></testsuites>

@@ -1,0 +1,40 @@
+{
+  "summary": "Tested DiscKit full-text search (build, plan, reader API and UI), the frozen PyInstaller app, the packaging files, the backend kit endpoints and the /burn KitSection. 24 of 25 pytest checks pass (new file test_disckit_fulltext.py). Build with full text gives fulltext:true, fulltext_docs=611, and docs+fts tables. --no-fulltext gives fulltext:false and the API returns available:false. Bowline is ranked first. Multi-word search, prefix on the last word (trefo -> Trefoil knot), paging with no overlap, empty q, and 12 special-character or FTS-syntax queries all work with no 500s. Reader UI passes every flow: suggestions, 'Search every word', Enter, results count, <mark> highlights, 'More results' (15 -> 30), clicking a result opens the article and hides the panel, 'back to reading', and Random/Home/monitor. No page errors. The frozen app builds and serves /_disckit/. bash -n passes, the workflow YAML is valid, and the icon is 1024x1024 RGBA with transparent corners. /api/kit/info and /api/kit/download are correct, and the KitSection renders both options with the icon loaded and v1.1.0. MAIN BUG: bm25 ranking always returns 0, so 'best matches first' only works when the search words appear in a title. Every body-only match comes back in insertion (alphabetical) order.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "disckit reader /_disckit/api/fulltext (textindex.FTS_SCHEMA + Volume.fulltext)", "issue": "The FTS5 table is created with content='' plus detail=column. With that pair, bm25() returns 0.0 for every row. I confirmed this on the knots index ('paracord', 5/611 docs, all 0.0) and in a 5-row in-memory test on SQLite 3.40.1. content='' alone or detail=column alone scores correctly (-0.544 vs -0.264). So ORDER BY f.r does nothing, and results for body-only matches come back in rowid order. Example: q=sailor rope returns Adjustable bend, Adjustable grip hitch, Albright special... On real Wikipedia, any query with no title match will be alphabetical, not 'best matches first'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/_disckit/api/fulltext?page=abc", "issue": "int() raises ValueError in Handler._api, so the connection is dropped with no response. Wrap the parse in try/except and default to 0."},
+      {"endpoint": "textindex.snippet", "issue": "Terms with diacritics (q=lé) match through FTS remove_diacritics, but the snippet regex is diacritic-sensitive, so nothing is highlighted. Also, articles whose whole text equals the title (e.g. 'Braid length', a stub/redirect-like page) get an empty snippet, which shows as a blank <p>."},
+      {"endpoint": "disckit plan CLI", "issue": "Prints the search index size in GB with 2 decimals, so small sources show '~0.00 GB' both with and without --no-fulltext. The plan() dict is correct (997225 bytes vs 0). The estimate is also about 45% low: 1.0 MB estimated vs about 1.8 MB actual index.db growth."},
+      {"endpoint": "Volume.fulltext performance", "issue": "Each request sorts every matching row (ORDER BY lower(title)=?, title-subquery IN, bm25) before LIMIT. For common words on full Wikipedia (millions of matches) read from an M-DISC, this may take many seconds. Consider capping the candidate set or using FTS5's ORDER BY rank."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reader results header", "issues": ["Uses 'contain' even when the count is 1 ('1 article contain …'). Should be 'contains'."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_disckit_fulltext.py", "/app/test_reports/pytest/pytest_fulltext.xml"],
+  "action_items": [
+    "Fix FTS ranking: change FTS_SCHEMA so bm25 works. Either drop content='' (keep detail=column; costs storage for a body copy) or keep content='' with detail=full (larger index but supports TF/phrases). Then re-check that 'Bowline' and body-only queries rank by relevance. Existing built discs would need a rebuild.",
+    "Guard the page param parse in reader/server.py _api (non-integer page currently kills the connection).",
+    "Optional: make snippet highlighting diacritic-insensitive (normalize with unicodedata NFKD for the regex), skip or fill empty snippets, and print the plan index size in MB when under 1 GB.",
+    "Rebuild /tmp/pyi frozen app after the fixes. The current binary (04:17:16) is older than volume.py (04:17:41) and lacks the title-boost ranking: its bowline query returns '62 knot' first and Bowline is not on page 1."
+  ],
+  "critical_code_review_comments": [
+    "volume.py Volume.fulltext: the title-match ORDER BY term runs a second MATCH subquery per request. Fine for this ZIM, but on a 6M-doc index the IN-subquery plus full sort could be slow.",
+    "server.py Library.fulltext: 'more' is computed as len(results)==per_page summed across all text volumes. With more than one text volume this is wrong (2 volumes x 15 rows each). OK for the current 2-disc layout with one Text Disc.",
+    "shell.html: snippets and titles go through esc() before innerHTML, so injected article HTML is neutralized. esc() does not escape single quotes, but every attribute uses double quotes, so this is safe."
+  ],
+  "updated_files": ["/app/backend/tests/test_disckit_fulltext.py"],
+  "success_rate": {"backend": "96% (24/25 pytest; plus ranking bug found by manual analysis)", "frontend": "100%"},
+  "seed_data_creation": "Temp builds in /tmp/ft (T, M, T2, M2) and /tmp/fz; pytest creates its own tempdirs",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: pytest /app/backend/tests/test_disckit_fulltext.py. It builds knots.zim twice and starts readers on free ports, about 4s total. To check ranking, run on index.db: SELECT d.title, bm25(fts,8.0,1.0) FROM fts JOIN docs d ON d.id=fts.rowid WHERE fts MATCH '\"paracord\"*'. All values should not be 0. For body-only ranking use q=sailor rope or q=climbing. Reader UI testids: reader-search, reader-search-all, reader-results, reader-results-count, reader-result, reader-results-more, #ftclose.",
+  "rca of the issue": "SQLite FTS5 with a contentless table (content='') and detail=column cannot supply per-row phrase instance data to the bm25 auxiliary function, so bm25 returns 0.0 for every row. Repro: CREATE VIRTUAL TABLE a USING fts5(body, content='', detail=column); insert 5 rows; SELECT bm25(a) ... MATCH 'apple' -> 0.0, 0.0. Mitigation: use detail=full with content='', or keep stored content with detail=column."
+}

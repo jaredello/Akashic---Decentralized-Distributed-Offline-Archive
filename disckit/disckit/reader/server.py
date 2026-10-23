@@ -85,7 +85,8 @@ class Library:
                     text = html_to_text(data) if base_mime(mime) == "text/html" else bytes(data).decode("utf-8", "replace")
                     if title and text.startswith(title):
                         text = text[len(title):].lstrip()
-                out["results"].append({"path": path, "title": title, "snippet": snippet(text, terms)})
+                out["results"].append({"path": path, "title": title,
+                                       "snippet": snippet(text, terms) or [["(no excerpt)", False]]})
         out["more"] = len(out["results"]) == per_page
         return out
 
@@ -153,7 +154,8 @@ def make_handler(lib):
             if name == "search":
                 return self._json(lib.search((q.get("q") or [""])[0]))
             if name == "fulltext":
-                page = int((q.get("page") or ["0"])[0] or 0)
+                raw = (q.get("page") or ["0"])[0]
+                page = int(raw) if raw.isdigit() else 0
                 return self._json(lib.fulltext((q.get("q") or [""])[0], max(page, 0)))
             if name == "random":
                 return self._json({"path": lib.random_path()})
