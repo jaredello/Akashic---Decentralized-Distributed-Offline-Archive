@@ -1,0 +1,15 @@
+DiscKit for macOS (Apple Silicon)
+=================================
+
+1. Drag DiscKit into the Applications folder.
+2. Double-click DiscKit. It is signed and notarized by Apple, so it opens normally -
+   even on a Mac that is offline.
+
+DiscKit has three tabs:
+  1 Build discs  - split a Kiwix .zim (e.g. full English Wikipedia), a folder or a
+                   website into a Text Disc and a Media Disc, with full-text search.
+  2 Burn         - burn both discs on your two M-DISC drives at the same time.
+  3 Read         - read both discs together in your browser.
+
+Get English Wikipedia: https://download.kiwix.org/zim/wikipedia/
+  (newest wikipedia_en_all_maxi_YYYY-MM.zim, about 110 GB)

@@ -85,6 +85,11 @@ export const KitSection = () => {
           <p className="text-[11px] text-[#72777d] mt-3">
             The app isn't signed by Apple yet. On first launch, right-click it and choose <b>Open</b>. On macOS 15 or later, go to System Settings → Privacy &amp; Security → <b>Open Anyway</b>.
           </p>
+          {info?.app?.signing_ready && (
+            <p className="text-[11px] text-[#54595d] mt-2 border-l-2 border-[#15803d] pl-2" data-testid="kit-signing-note">
+              <b>Ready for signing:</b> once you have an Apple Developer account, add 5 secrets to your GitHub repo and every build is signed and approved by Apple (it opens with a normal double-click, even offline). Step-by-step guide: <span className="mono">{info.app.signing_guide}</span> in the kit.
+            </p>
+          )}
         </div>
         <div className="bg-white p-5" data-testid="kit-source-option">
           <div className="flex items-center gap-2 mb-1">

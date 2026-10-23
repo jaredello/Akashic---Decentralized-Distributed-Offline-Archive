@@ -20,8 +20,24 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build app and disk image
+      - name: Build app and disk image (signed + notarized when Apple secrets are set)
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         run: bash disckit/packaging/macos/build_app.sh
+
+      - name: Build summary
+        run: |
+          if ls disckit/dist/*-unsigned.dmg >/dev/null 2>&1; then
+            echo "### DiscKit built UNSIGNED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Add the Apple secrets listed in disckit/packaging/macos/SIGNING.md to sign and notarize." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### DiscKit signed and notarized by Apple" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          ls -la disckit/dist/*.dmg >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test the app on a real Wikipedia file
         run: |

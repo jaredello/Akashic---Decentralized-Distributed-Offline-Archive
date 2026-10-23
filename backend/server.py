@@ -854,7 +854,7 @@ async def burn_checksums():
 
 
 KIT_DIR = ROOT_DIR.parent / "disckit"
-KIT_SUFFIXES = {".py", ".html", ".md", ".txt", ".command", ".sh", ".png"}
+KIT_SUFFIXES = {".py", ".html", ".md", ".txt", ".command", ".sh", ".png", ".plist"}
 
 
 def _kit_files():
@@ -876,7 +876,7 @@ async def kit_info():
         "size_bytes": sum(p.stat().st_size for p in files),
         "sources": ["zim", "folder", "website"],
         "features": ["fulltext_search", "dual_drive_reader", "parallel_burn"],
-        "app": {"arch": "arm64", "signed": False, "dmg_url": os.environ.get("DISCKIT_DMG_URL"),
+        "app": {"arch": "arm64", "signed": False, "signing_ready": True, "signing_guide": "packaging/macos/SIGNING.md", "dmg_url": os.environ.get("DISCKIT_DMG_URL"),
                 "workflow": ".github/workflows/disckit-macos.yml"},
     }
 

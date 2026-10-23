@@ -17,6 +17,8 @@ Where the .dmg comes from: this repo contains `.github/workflows/disckit-macos.y
 GitHub's own Macs build the app automatically — open your repo → **Actions** → *Build DiscKit.app (macOS)* →
 latest run → download **DiscKit-macOS-arm64**. Push a tag like `disckit-v1.1.0` to also publish it as a Release.
 To build it yourself on a Mac: `bash packaging/macos/build_app.sh` (output in `dist/`).
+To sign and notarize the app so it opens with a plain double-click, follow `packaging/macos/SIGNING.md`.
+Without those secrets the build still works and makes an unsigned app.
 
 **Alternative — run from source:** double-click **install.command** (needs Python 3.10+ with Tk 8.6, from
 python.org or `brew install python python-tk`), then **DiscKit.command**.

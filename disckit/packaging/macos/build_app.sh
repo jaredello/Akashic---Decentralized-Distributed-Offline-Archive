@@ -44,8 +44,16 @@ PLIST="$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :NSHumanReadableCopyright string 'DiscKit — Text Disc + Media Disc archiver'" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 12.0" "$PLIST" 2>/dev/null || true
 
-# Unsigned build: ad-hoc signature so Apple Silicon will launch it.
-codesign --force --deep --sign - "$APP"
+source "$HERE/sign_notarize.sh"
+
+if signing_enabled; then
+  setup_keychain
+  sign_app "$APP"
+  notarize "$APP"            # staples the ticket into DiscKit.app so it opens offline too
+else
+  echo "::notice::Apple signing secrets not set - building an UNSIGNED app (see packaging/macos/SIGNING.md)."
+  codesign --force --deep --sign - "$APP"   # ad-hoc signature so Apple Silicon will launch it
+fi
 
 # Smoke test the frozen binary (CLI mode) before packaging.
 "$APP/Contents/MacOS/DiscKit" --help >/dev/null
@@ -54,8 +62,19 @@ DMG_SRC="$BUILD/dmg"
 mkdir -p "$DMG_SRC"
 cp -R "$APP" "$DMG_SRC/"
 ln -s /Applications "$DMG_SRC/Applications"
-cp "$HERE/FIRST_LAUNCH.txt" "$DMG_SRC/Read me first.txt"
-DMG="dist/DiscKit-$VERSION-macOS-$ARCH.dmg"
+if signing_enabled; then
+  cp "$HERE/FIRST_LAUNCH_SIGNED.txt" "$DMG_SRC/Read me first.txt"
+else
+  cp "$HERE/FIRST_LAUNCH.txt" "$DMG_SRC/Read me first.txt"
+fi
+SUFFIX=$(signing_enabled && echo "" || echo "-unsigned")
+DMG="dist/DiscKit-$VERSION-macOS-$ARCH$SUFFIX.dmg"
 hdiutil create -volname "DiscKit $VERSION" -srcfolder "$DMG_SRC" -ov -format UDZO "$DMG"
+
+if signing_enabled; then
+  codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+  notarize "$DMG"
+  spctl --assess --type open --context context:primary-signature -vv "$DMG"
+fi
 shasum -a 256 "$DMG" | tee "$DMG.sha256"
 echo "Built $DMG"
