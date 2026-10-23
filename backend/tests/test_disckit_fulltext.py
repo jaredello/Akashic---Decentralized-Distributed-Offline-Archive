@@ -150,7 +150,48 @@ def test_special_chars_no_500(ft_reader, q):
 
 def test_bad_page_param(ft_reader):
     r = requests.get(ft_reader[1] + "/_disckit/api/fulltext", params={"q": "knot", "page": "abc"})
-    assert r.status_code < 500
+    assert r.status_code == 200 and r.json()["page"] == 0
+
+
+# --- ranking (iteration_5: bm25 fixed with content='' + detail=full)
+def test_bm25_nonzero(ft_reader):
+    db = sqlite3.connect(str(ft_reader[0] / "index.db"))
+    sql = db.execute("select sql from sqlite_master where name='fts'").fetchone()[0]
+    assert "detail=full" in sql
+    scores = [r[0] for r in db.execute("SELECT bm25(fts,10,1) FROM fts WHERE fts MATCH '\"paracord\"*'")]
+    assert scores and all(s != 0 for s in scores)
+
+
+def test_body_only_ranked_not_alphabetical(ft_reader):
+    titles = [h["title"] for h in _ft(ft_reader[1], "sailor rope")["results"]]
+    assert titles[0] == "Sailor's hitch" and titles != sorted(titles)
+    titles = [h["title"] for h in _ft(ft_reader[1], "paracord")["results"]]
+    assert titles[0] == "Lanyard" and titles != sorted(titles)
+
+
+def test_no_excerpt_placeholder(ft_reader):
+    hit = [h for h in _ft(ft_reader[1], "braid length")["results"] if h["title"] == "Braid length"]
+    assert hit and hit[0]["snippet"] == [["(no excerpt)", False]]
+
+
+def test_accent_insensitive_highlight(ft_reader):
+    r = _ft(ft_reader[1], "mobius")
+    assert any(seg == "Möbius" for h in r["results"] for seg, m in h["snippet"] if m)
+
+
+def test_paging_no_gap_with_pinned_title(ft_reader):
+    # 'Knot' is pinned first but is not in bm25 top-15; every bm25 hit must still appear on some page
+    url = ft_reader[1]
+    got = [h["path"] for pg in range(3) for h in _ft(url, "knot", pg)["results"]]
+    assert len(got) == len(set(got))
+    assert "Diamond_knot" in got, "15th bm25 hit dropped by exact-title pin"
+
+
+def test_plan_cli_mb():
+    out = subprocess.run([sys.executable, "-m", "disckit", "plan", "zim", ZIM], cwd=KIT, capture_output=True, text=True).stdout
+    out2 = subprocess.run([sys.executable, "-m", "disckit", "plan", "zim", ZIM, "--no-fulltext"], cwd=KIT, capture_output=True, text=True).stdout
+    assert "MB" in out and "search index: ~0.0 MB" not in out
+    assert "search index: ~0.0 MB" in out2
 
 
 def test_negative_page(ft_reader):

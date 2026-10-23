@@ -279,15 +279,18 @@ class Volume:
         exact = db.execute(
             "SELECT d.id, d.path, d.title FROM titles t JOIN docs d ON d.path = t.path WHERE t.key = ? LIMIT 1",
             (" ".join(terms),)).fetchone()
+        ex_id = exact[0] if exact else -1
+        lim, off = limit, offset
+        if exact:
+            lim, off = (limit - 1, 0) if offset == 0 else (limit, offset - 1)
         ranked = db.execute(
             "SELECT d.id, d.path, d.title FROM (SELECT rowid, bm25(fts, 10.0, 1.0) AS r FROM fts "
-            "WHERE fts MATCH ? ORDER BY r LIMIT ? OFFSET ?) f JOIN docs d ON d.id = f.rowid ORDER BY f.r",
-            (q, limit + 1, offset)).fetchall()
-        if exact:
-            ranked = [r for r in ranked if r[0] != exact[0]]
-            if offset == 0:
-                ranked.insert(0, exact)
-        rows = [(p, t) for _, p, t in ranked[:limit]]
+            "WHERE fts MATCH ? AND rowid != ? ORDER BY r LIMIT ? OFFSET ?) f JOIN docs d ON d.id = f.rowid "
+            "ORDER BY f.r",
+            (q, ex_id, lim, off)).fetchall()
+        if exact and offset == 0:
+            ranked.insert(0, exact)
+        rows = [(p, t) for _, p, t in ranked]
         total = db.execute("SELECT count(*) FROM (SELECT rowid FROM fts WHERE fts MATCH ? LIMIT 1000)",
                            (q,)).fetchone()[0]
         return total, rows

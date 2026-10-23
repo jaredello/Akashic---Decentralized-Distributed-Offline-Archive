@@ -1,0 +1,33 @@
+{
+  "summary": "Retested DiscKit full-text search after the iteration_4 fixes. The HIGH bm25 bug is FIXED. The FTS table is now content='' + detail=full, and bm25 scores are non-zero (paracord: -5.07 .. -3.55). Body-only queries are ranked by relevance, not alphabetically: 'sailor rope' gives Sailor's hitch, Gripping sailor's hitch, Swing hitch...; 'paracord' gives Lanyard, Albright special, Hunter's bend...; 'climbing' gives List of climbing knots first. 'bowline' still puts Bowline first. All minor fixes verified: page=abc returns 200 with page 0; accent-insensitive highlighting works (q=mobius highlights 'Möbius', q=nœud works); 'Braid length' shows '(no excerpt)'; plan prints MB (search index ~3.1 MB, and ~0.0 MB with --no-fulltext); the header reads '1 article contains khrushchev' vs 'N articles contain'. Reader UI regression passes: suggestions, 'Search every word', Enter -> results with <mark>, More results (15 -> 30), clicking a result link opens the article and hides the panel, back to reading, Random, Home, and monitor close/toggle. No page errors. Frozen app /root/pyi/dist/DiscKit/DiscKit (built 04:24:01, newer than volume.py and textindex.py) builds, reads, puts Bowline first, ranks paracord correctly, and returns 200 for page=abc. /burn KitSection shows '15–25 GB' and v1.1.0, and /api/kit/info reports 1.1.0. NEW MEDIUM BUG: paging skips a result when the exact-title article is pinned but is not in the bm25 top 15.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Volume.fulltext (exact-title pin + paging)", "issue": "On page 0 the exact-title row is inserted at the top and the list is cut with ranked[:limit]. If that row was not already among the limit+1 bm25 rows, this drops the 15th bm25 hit. Page 1 uses OFFSET 15, so that hit never appears on any page. Repro: q=knot. 'Knot' is not in the bm25 top 40, and 'Diamond_knot' (bm25 index 14) is missing from all 15 pages. Fix: when exact exists and offset>0, query bm25 with OFFSET offset-1 (or offset-1 only when exact is not in the first offset rows). Alternatively, exclude the exact rowid in SQL (AND rowid != ?) and use limit-1 on page 0.", "priority": "MEDIUM"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reader search results", "issues": ["Only the title <a> inside a .hit is clickable. Clicking the snippet or row area does nothing. Consider making the whole hit card clickable (optional UX)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_disckit_fulltext.py", "/app/test_reports/pytest/pytest_fulltext_5.xml"],
+  "action_items": [
+    "Fix the paging gap in Volume.fulltext when the exact-title match is pinned but is not in the bm25 window. test_paging_no_gap_with_pinned_title (q=knot expects Diamond_knot on pages 0-2) currently fails.",
+    "Rebuild the frozen app after that fix."
+  ],
+  "critical_code_review_comments": [
+    "volume.py fulltext: 'total' counts up to 1000 matches and does not include the pinned exact row when it falls outside the MATCH set. It always matches, so this is fine, but the cap at 1000 is shown in the UI as an exact count ('1000 articles contain'). Consider showing '1000+'.",
+    "server.py Library.fulltext: 'more' = len(results)==per_page. This is still wrong with multiple text volumes (carried over from iteration_4). It also gives a false 'More results' button when total is an exact multiple of 15. Minor.",
+    "Common words like 'zeppelin', 'hangman', and 'albright' match about 210 docs because the navbox text is indexed into every article body. This dilutes relevance. Consider dropping navbox/footer elements (class=navbox) in html_to_text."
+  ],
+  "updated_files": ["/app/backend/tests/test_disckit_fulltext.py"],
+  "success_rate": {"backend": "97% (30/31 pytest; the failure is the new paging-gap bug)", "frontend": "100%"},
+  "seed_data_creation": "Temp builds in /tmp/r5 (T,M) and /tmp/r5f (frozen app build); pytest creates its own tempdirs",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: pytest /app/backend/tests/test_disckit_fulltext.py (about 6s). New tests added: test_bm25_nonzero, test_body_only_ranked_not_alphabetical, test_no_excerpt_placeholder, test_accent_insensitive_highlight, test_paging_no_gap_with_pinned_title (failing), test_plan_cli_mb. Single-hit query for the header check: khrushchev or matsumoto. Result navigation needs a click on '[data-testid=reader-result] a[data-path]', not the div.",
+  "rca of the issue": "Paging gap: Volume.fulltext fetches limit+1 bm25 rows at OFFSET page*limit. It then inserts the exact-title row at the top on page 0 and slices [:limit]. When the exact row was not in that window, the bm25 row at index limit-1 gets sliced away. The next page starts at OFFSET limit, so that row is never returned. Mitigation: exclude the exact rowid in SQL, and on page 0 fetch limit-1 rows; on later pages use OFFSET page*limit-1 when exact exists."
+}

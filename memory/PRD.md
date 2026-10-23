@@ -100,3 +100,9 @@ Location: /app/disckit (downloadable zip via GET /api/kit/download, info at /api
 - Verified false positives: server.py `is` comparisons (all `is None`), `data` at server.py:333, DiskContext/Burn hook deps
 - Deferred: large refactors (split Burn.js / Portal.js / server.py _run_burn)
 - Open security audit items: SEC-001 rate-limit/cap /api/burn & /api/seed/expand; SEC-002 CORS allowlist
+
+## DiscKit v1.1.0 (Jun 2026) — DONE (iteration_4/5 + tests/test_disckit_fulltext.py 31/31)
+- Full-text search: SQLite FTS5 (content='', detail=full, unicode61 remove_diacritics) on the Text Disc (docs + fts tables), bm25(title 10, body 1) with exact-title pinned first; reader /_disckit/api/fulltext (paging, highlighted accent-insensitive snippets read live from disc); shell: Enter / "Search every word" opens results panel; GUI checkbox + CLI --no-fulltext; plan() measures index size on a real sample (est. 15–25 GB for full English Wikipedia)
+- Mac App Bundle: packaging/macos/{build_app.sh (PyInstaller, iconutil icns, ad-hoc codesign, dmg), launcher.py, icon.png, FIRST_LAUNCH.txt}; GitHub Actions /app/.github/workflows/disckit-macos.yml (macos-14 arm64, smoke test on ray-charles ZIM, artifact + release on tag disckit-v*); unsigned
+- Web: KitSection shows DiscKit.app option (icon /disckit-icon.png, GitHub steps or DISCKIT_DMG_URL button) + source kit zip
+- Frozen app validated on Linux PyInstaller stand-in (/root/pyi); real mac build happens on GitHub after Save to GitHub
