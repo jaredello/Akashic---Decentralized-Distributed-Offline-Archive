@@ -28,6 +28,7 @@ def _add_source_args(p):
     p.add_argument("--max-depth", type=int, default=5)
     p.add_argument("--delay", type=float, default=0.5, help="seconds between website requests")
     p.add_argument("--no-external", action="store_true", help="don't copy images/CSS hosted on other domains")
+    p.add_argument("--no-fulltext", action="store_true", help="skip the full-text search index")
 
 
 def main(argv=None):
@@ -73,14 +74,15 @@ def _main(argv=None):
         return run()
 
     if a.cmd == "plan":
-        r = plan(_source(a), Rules(a.svg_on_text), a.disc_gb)
+        r = plan(_source(a), Rules(a.svg_on_text), a.disc_gb, fulltext=not a.no_fulltext)
         if not r["estimable"]:
             print(r["note"]); return
         for role in ("text", "media"):
             d = r[role]
             print(f"{role.title():5} Disc: {d['items']:>10,} items  ~{d['est_bytes'] / GB:8.2f} GB  "
                   f"({d['fill_pct']:5.1f}% of {a.disc_gb} GB)  {'fits' if d['fits'] else 'DOES NOT FIT'}")
-        print(f"Redirects: {r['redirects']:,}   skipped: {r['skipped']:,}")
+        print(f"Redirects: {r['redirects']:,}   skipped: {r['skipped']:,}   "
+              f"search index: ~{r['text']['fulltext_bytes'] / GB:.2f} GB (included in Text Disc)")
         return
 
     if a.cmd == "build":
@@ -94,7 +96,8 @@ def _main(argv=None):
                                  f"media {s['media_bytes'] / GB:.3f} GB  {s['rate']:.0f}/s   ")
         threading.Thread(target=ticker, daemon=True).start()
         try:
-            build(_source(a), a.text_out, a.media_out, a.disc_gb, Rules(a.svg_on_text), a.label, prog)
+            build(_source(a), a.text_out, a.media_out, a.disc_gb, Rules(a.svg_on_text), a.label, prog,
+                  fulltext=not a.no_fulltext)
         finally:
             done.set(); sys.stderr.write("\n")
         return

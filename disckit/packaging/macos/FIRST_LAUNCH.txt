@@ -1,0 +1,18 @@
+DiscKit for macOS (Apple Silicon)
+=================================
+
+1. Drag DiscKit into the Applications folder.
+2. This app is not signed by Apple yet, so macOS asks before the first launch:
+   - macOS 14 and earlier: right-click DiscKit in Applications -> Open -> Open.
+   - macOS 15 (Sequoia) and later: double-click DiscKit, press Done, then open
+     System Settings -> Privacy & Security, scroll down and press "Open Anyway".
+   You only need to do this once.
+
+DiscKit has three tabs:
+  1 Build discs  - split a Kiwix .zim (e.g. full English Wikipedia), a folder or a
+                   website into a Text Disc and a Media Disc, with full-text search.
+  2 Burn         - burn both discs on your two M-DISC drives at the same time.
+  3 Read         - read both discs together in your browser.
+
+Get English Wikipedia: https://download.kiwix.org/zim/wikipedia/
+  (newest wikipedia_en_all_maxi_YYYY-MM.zim, about 110 GB)

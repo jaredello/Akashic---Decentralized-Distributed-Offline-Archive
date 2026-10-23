@@ -44,6 +44,7 @@ class App(tk.Tk):
             "read_text": "", "read_media": "", "port": 8800}.items()}
         self.svg = tk.BooleanVar(value=self.s.get("svg", False))
         self.external = tk.BooleanVar(value=self.s.get("external", True))
+        self.fulltext = tk.BooleanVar(value=self.s.get("fulltext", True))
         self.verify_after = tk.BooleanVar(value=True)
         self._ui()
         self.after(150, self._drain)
@@ -58,7 +59,7 @@ class App(tk.Tk):
 
     def _save_settings(self):
         data = {k: v.get() for k, v in self.v.items()}
-        data.update(svg=self.svg.get(), external=self.external.get())
+        data.update(svg=self.svg.get(), external=self.external.get(), fulltext=self.fulltext.get())
         try:
             SETTINGS.write_text(json.dumps(data, indent=2))
         except OSError:
@@ -170,7 +171,11 @@ class App(tk.Tk):
                      width=22).pack(side="left")
         ttk.Label(opts, text="   Disc label").pack(side="left")
         ttk.Entry(opts, textvariable=self.v["label"], width=14).pack(side="left", padx=4)
-        ttk.Checkbutton(opts, text="Keep SVG drawings on Text Disc", variable=self.svg).pack(side="left", padx=10)
+        opts2 = ttk.Frame(out)
+        opts2.pack(fill="x", pady=(6, 0))
+        ttk.Label(opts2, text="", width=16).pack(side="left")
+        ttk.Checkbutton(opts2, text="Full-text search (index every word)", variable=self.fulltext).pack(side="left")
+        ttk.Checkbutton(opts2, text="Keep SVG drawings on Text Disc", variable=self.svg).pack(side="left", padx=14)
 
         bar = ttk.Frame(t)
         bar.pack(fill="x")
@@ -304,14 +309,17 @@ class App(tk.Tk):
 
         def work():
             try:
-                r = plan(self._make_source(), Rules(self.svg.get()), self._disc_gb(), cancel=self.cancel)
+                r = plan(self._make_source(), Rules(self.svg.get()), self._disc_gb(), cancel=self.cancel,
+                         fulltext=self.fulltext.get())
                 if not r["estimable"]:
                     txt = r["note"]
                 else:
                     t, m = r["text"], r["media"]
                     txt = (f"Text Disc: {t['items']:,} items, ~{human(t['est_bytes'])} "
                            f"({t['fill_pct']:.1f}% — {'fits' if t['fits'] else 'DOES NOT FIT'}; "
-                           f"text compresses to {t['compression_ratio'] * 100:.0f}%)\n"
+                           f"text compresses to {t['compression_ratio'] * 100:.0f}%"
+                           + (f"; incl. ~{human(t['fulltext_bytes'])} search index" if t["fulltext_bytes"] else "")
+                           + ")\n"
                            f"Media Disc: {m['items']:,} items, ~{human(m['est_bytes'])} "
                            f"({m['fill_pct']:.1f}% — {'fits' if m['fits'] else 'DOES NOT FIT'})   "
                            f"· {r['redirects']:,} redirects")
@@ -338,7 +346,8 @@ class App(tk.Tk):
         def work():
             try:
                 build(self._make_source(), text_out, media_out, self._disc_gb(), Rules(self.svg.get()),
-                      self.v["label"].get().strip().upper() or "DISCKIT", self.progress, self.log, self.cancel)
+                      self.v["label"].get().strip().upper() or "DISCKIT", self.progress, self.log, self.cancel,
+                      fulltext=self.fulltext.get())
 
                 def after():
                     self.v["burn_text"].set(text_out)

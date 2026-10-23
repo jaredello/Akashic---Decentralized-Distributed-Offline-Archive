@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Laptop, Download, FileArchive, FolderOpen, Globe, Disc3, BookOpen } from "lucide-react";
+import { Laptop, Download, FileArchive, FolderOpen, Globe, Disc3, BookOpen, Search, Github, Terminal } from "lucide-react";
 import { http, API, fmtBytes } from "@/lib/api";
 
 const STEPS = [
@@ -12,7 +12,27 @@ const SOURCES = [
   { icon: FileArchive, label: "Kiwix .zim files" },
   { icon: FolderOpen, label: "Any folder of files" },
   { icon: Globe, label: "Whole websites" },
+  { icon: Search, label: "Full-text search" },
 ];
+
+const AppDownload = ({ info }) => {
+  const dmg = info?.app?.dmg_url;
+  if (dmg) {
+    return (
+      <a href={dmg} data-testid="kit-dmg-btn"
+        className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-sm bg-[#3366cc] text-white text-sm font-semibold hover:bg-[#2a4b8d] transition-colors">
+        <Download size={16} /> Download DiscKit.app (.dmg)
+      </a>
+    );
+  }
+  return (
+    <ol className="text-xs text-[#54595d] space-y-1 list-decimal ml-4" data-testid="kit-dmg-steps">
+      <li>Use <b>Save to GitHub</b> in the chat box to push this project.</li>
+      <li>On GitHub open <b>Actions → Build DiscKit.app (macOS)</b>; GitHub's Macs build it in about 5 minutes.</li>
+      <li>Download the <span className="mono">DiscKit-macOS-arm64</span> file from that run, open the .dmg and drag DiscKit into Applications.</li>
+    </ol>
+  );
+};
 
 export const KitSection = () => {
   const [info, setInfo] = useState(null);
@@ -51,23 +71,44 @@ export const KitSection = () => {
           </div>
         ))}
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-5 border-t border-[#eaecf0]">
-        <a
-          href={`${API}/kit/download`}
-          download
-          data-testid="kit-download-btn"
-          className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-sm bg-[#202122] text-white text-sm font-semibold hover:bg-black transition-colors"
-        >
-          <Download size={16} /> Download DiscKit for macOS
-        </a>
-        <span className="mono text-[11px] text-[#72777d]" data-testid="kit-meta">
-          {info ? `v${info.version} · ${info.file_count} files · ${fmtBytes(info.size_bytes)} · requires Python 3.10+` : "Loading…"}
-        </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#eaecf0] border-t border-[#eaecf0]">
+        <div className="bg-white p-5" data-testid="kit-app-option">
+          <div className="flex items-center gap-2 mb-1">
+            <img src="/disckit-icon.png" alt="DiscKit app icon" className="w-9 h-9" data-testid="kit-app-icon" />
+            <div>
+              <div className="wiki-serif text-base text-[#202122]">DiscKit.app <span className="mono text-[10px] text-[#15803d] align-middle ml-1">RECOMMENDED</span></div>
+              <div className="mono text-[10px] text-[#72777d]">Apple Silicon · no Python needed · {info ? `v${info.version}` : "…"}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#54595d] mb-3"><Github size={12} /> Built automatically on GitHub's Macs</div>
+          <AppDownload info={info} />
+          <p className="text-[11px] text-[#72777d] mt-3">
+            The app isn't signed by Apple yet. On first launch, right-click it and choose <b>Open</b>. On macOS 15 or later, go to System Settings → Privacy &amp; Security → <b>Open Anyway</b>.
+          </p>
+        </div>
+        <div className="bg-white p-5" data-testid="kit-source-option">
+          <div className="flex items-center gap-2 mb-1">
+            <Terminal size={18} className="text-[#202122]" />
+            <div className="wiki-serif text-base text-[#202122]">Source kit</div>
+          </div>
+          <p className="text-xs text-[#54595d] mb-3">Same app, run with your own Python 3.10+. It also includes the app build script.</p>
+          <a
+            href={`${API}/kit/download`}
+            download
+            data-testid="kit-download-btn"
+            className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-sm bg-[#202122] text-white text-sm font-semibold hover:bg-black transition-colors"
+          >
+            <Download size={16} /> Download source kit (.zip)
+          </a>
+          <div className="mono text-[11px] text-[#72777d] mt-2" data-testid="kit-meta">
+            {info ? `v${info.version} · ${info.file_count} files · ${fmtBytes(info.size_bytes)}` : "Loading…"}
+          </div>
+        </div>
       </div>
-      <p className="px-5 pb-5 -mt-2 text-xs text-[#72777d] max-w-2xl">
-        Unzip the download, double-click <span className="mono">install.command</span> once, then open <span className="mono">DiscKit.command</span>.
-        Get the newest <span className="mono">wikipedia_en_all_maxi</span> file from{" "}
+      <p className="px-5 py-4 border-t border-[#eaecf0] text-xs text-[#72777d]">
+        Get the newest <span className="mono">wikipedia_en_all_maxi</span> file (about 110 GB) from{" "}
         <a className="text-[#3366cc] hover:underline" href="https://download.kiwix.org/zim/wikipedia/" target="_blank" rel="noreferrer">download.kiwix.org</a>.
+        With full-text search switched on, the index adds roughly 12–18 GB to the Text Disc.
       </p>
     </section>
   );

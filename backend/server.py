@@ -854,7 +854,7 @@ async def burn_checksums():
 
 
 KIT_DIR = ROOT_DIR.parent / "disckit"
-KIT_SUFFIXES = {".py", ".html", ".md", ".txt", ".command"}
+KIT_SUFFIXES = {".py", ".html", ".md", ".txt", ".command", ".sh", ".png"}
 
 
 def _kit_files():
@@ -875,6 +875,9 @@ async def kit_info():
         "file_count": len(files),
         "size_bytes": sum(p.stat().st_size for p in files),
         "sources": ["zim", "folder", "website"],
+        "features": ["fulltext_search", "dual_drive_reader", "parallel_burn"],
+        "app": {"arch": "arm64", "signed": False, "dmg_url": os.environ.get("DISCKIT_DMG_URL"),
+                "workflow": ".github/workflows/disckit-macos.yml"},
     }
 
 
@@ -885,7 +888,7 @@ async def kit_download():
         for p in _kit_files():
             info = zipfile.ZipInfo(f"DiscKit/{p.relative_to(KIT_DIR).as_posix()}", time.localtime(p.stat().st_mtime)[:6])
             info.compress_type = zipfile.ZIP_DEFLATED
-            mode = 0o755 if p.suffix == ".command" else 0o644
+            mode = 0o755 if p.suffix in (".command", ".sh") else 0o644
             info.external_attr = (0o100000 | mode) << 16
             zf.writestr(info, p.read_bytes())
     return Response(

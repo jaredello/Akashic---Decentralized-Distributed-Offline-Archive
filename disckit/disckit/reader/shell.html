@@ -44,6 +44,19 @@
   dt { color:#54595d; } dd { margin:0; font-family: ui-monospace, Menlo, monospace; text-align:right; }
   .last { margin-top:8px; font-family: ui-monospace, Menlo, monospace; font-size:10px; color:#54595d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .note { margin:12px; font-size:11px; color:#72777d; line-height:1.5; }
+  .stage { flex:1; position:relative; display:flex; min-width:0; }
+  .results { position:absolute; inset:0; background:#fff; overflow:auto; display:none; padding:28px 48px 60px; }
+  .results.open { display:block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform:none; } }
+  .results h1 { font-family: "Linux Libertine", Georgia, serif; font-weight:normal; font-size:28px; margin:0 0 4px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .results .meta { font-size:13px; color:#54595d; margin:8px 0 22px; }
+  .hit { max-width:820px; margin-bottom:20px; }
+  .hit a { font-size:17px; color:var(--link); text-decoration:none; font-family: Georgia, serif; }
+  .hit a:hover { text-decoration:underline; }
+  .hit p { margin:4px 0 0; font-size:13.5px; line-height:1.55; color:var(--ink); }
+  .hit mark { background:#fef3c7; color:inherit; font-weight:600; padding:0 1px; }
+  .hit .p { font-family: ui-monospace, Menlo, monospace; font-size:10.5px; color:#15803d; }
+  .suggest a.all { color:var(--link); font-weight:600; background:#f8f9fa; }
   .warn { margin:12px; padding:8px 10px; font-size:12px; background:#fdeaea; border:1px solid #f3b5b5; color:#b32424; }
 </style>
 </head>
@@ -54,14 +67,17 @@
     <div class="wordmark" id="wordmark">Archive<small>READ FROM TWO DISCS</small></div>
   </div>
   <div class="search">
-    <input id="q" placeholder="Search the discs" autocomplete="off" data-testid="reader-search">
+    <input id="q" placeholder="Search titles — press Enter to search every word" autocomplete="off" data-testid="reader-search">
     <div class="suggest" id="sug"></div>
   </div>
   <button class="btn" id="random" data-testid="reader-random">Random</button>
   <button class="btn primary" id="toggle" data-testid="reader-monitor-toggle">Disc monitor</button>
 </header>
 <main>
-  <iframe id="view" data-testid="reader-frame" title="Archive content"></iframe>
+  <div class="stage">
+    <iframe id="view" data-testid="reader-frame" title="Archive content"></iframe>
+    <section class="results" id="results" data-testid="reader-results"></section>
+  </div>
   <aside id="mon" data-testid="reader-monitor">
     <div class="mon-head"><h2>Disc I/O monitor</h2><button class="x" id="close" data-testid="reader-monitor-close" title="Close">&times;</button></div>
     <div id="warn"></div>
@@ -75,7 +91,32 @@ const view = $("view"), mon = $("mon");
 let info = null, hist = {};
 const fmt = (b) => { if (!b) return "0 B"; const u = ["B","KB","MB","GB","TB"]; let i = 0; while (b >= 1000 && i < 4) { b /= 1000; i++; } return b.toFixed(i ? 1 : 0) + " " + u[i]; };
 const enc = (p) => "/" + p.split("/").map(encodeURIComponent).join("/");
-const go = (p) => { view.src = enc(p); };
+const go = (p) => { $("results").classList.remove("open"); view.src = enc(p); };
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let ftQuery = "", ftPage = 0;
+
+async function fulltext(q, page = 0) {
+  const box = $("results");
+  ftQuery = q; ftPage = page;
+  $("sug").style.display = "none";
+  if (page === 0) box.innerHTML = `<h1>Searching every word…</h1><div class="meta">Reading the full-text index on the Text Disc</div>`;
+  box.classList.add("open");
+  const r = await (await fetch(`/_disckit/api/fulltext?q=${encodeURIComponent(q)}&page=${page}`)).json();
+  if (!r.available) { box.innerHTML = `<h1>Full-text search unavailable</h1><div class="meta">This Text Disc was built without a full-text index. Rebuild with “Full-text search” switched on.</div>`; return; }
+  const hits = r.results.map((h) => `<div class="hit" data-testid="reader-result"><a href="#" data-path="${esc(h.path)}">${esc(h.title || h.path)}</a>
+    <div class="p">${esc(h.path)}</div><p>${h.snippet.map(([t, m]) => (m ? `<mark>${esc(t)}</mark>` : esc(t))).join("")}</p></div>`).join("");
+  const count = r.total >= 1000 ? "1,000+" : r.total.toLocaleString();
+  const more = r.more ? `<button class="btn" id="ftmore" data-testid="reader-results-more">More results</button>` : "";
+  if (page === 0) {
+    box.innerHTML = `<h1>Search results</h1><div class="meta" data-testid="reader-results-count">${count} article${r.total === 1 ? "" : "s"} contain <b>${esc(r.terms.join(" "))}</b> &middot; best matches first &middot; <a href="#" id="ftclose" style="color:var(--link)">back to reading</a></div><div id="fthits">${hits || '<p class="meta">No article on these discs contains every one of those words.</p>'}</div><div id="ftfoot">${more}</div>`;
+    $("ftclose").onclick = (e) => { e.preventDefault(); box.classList.remove("open"); };
+  } else {
+    $("fthits").insertAdjacentHTML("beforeend", hits);
+    $("ftfoot").innerHTML = more;
+  }
+  if ($("ftmore")) $("ftmore").onclick = () => fulltext(ftQuery, ftPage + 1);
+}
+$("results").addEventListener("click", (e) => { const a = e.target.closest("a[data-path]"); if (a) { e.preventDefault(); go(a.dataset.path); } });
 
 const discSvg = (color) => `<svg class="disc" viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="${color}" opacity=".14" stroke="${color}"/><circle cx="20" cy="20" r="13" fill="none" stroke="${color}" stroke-dasharray="3 5" opacity=".6"/><path d="M20 1 A19 19 0 0 1 39 20" stroke="${color}" stroke-width="2" fill="none"/><circle cx="20" cy="20" r="4" fill="#fff" stroke="${color}"/></svg>`;
 
@@ -131,15 +172,27 @@ $("q").addEventListener("input", async (e) => {
   if (!q) { $("sug").style.display = "none"; return; }
   const r = await fetch("/_disckit/api/search?q=" + encodeURIComponent(q));
   items = await r.json(); sel = -1;
-  $("sug").innerHTML = items.map((it, i) => `<a href="#" data-i="${i}">${it.title.replace(/</g, "&lt;")}</a>`).join("") || '<a href="#" style="color:#72777d">No matches on these discs</a>';
+  const all = info && info.fulltext ? `<a href="#" class="all" data-all="1" data-testid="reader-search-all">Search every word for “${esc(q)}”</a>` : "";
+  $("sug").innerHTML = (items.map((it, i) => `<a href="#" data-i="${i}">${esc(it.title)}</a>`).join("") || (all ? "" : '<a href="#" style="color:#72777d">No matching titles</a>')) + all;
   $("sug").style.display = "block";
 });
-$("sug").addEventListener("mousedown", (e) => { const a = e.target.closest("a"); if (a && a.dataset.i) { pick(+a.dataset.i); } e.preventDefault(); });
+$("sug").addEventListener("mousedown", (e) => {
+  const a = e.target.closest("a");
+  if (a && a.dataset.all) fulltext($("q").value.trim());
+  else if (a && a.dataset.i) pick(+a.dataset.i);
+  e.preventDefault();
+});
 $("q").addEventListener("keydown", (e) => {
   const links = [...$("sug").querySelectorAll("a[data-i]")];
   if (e.key === "ArrowDown") { sel = Math.min(sel + 1, links.length - 1); }
   else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); }
-  else if (e.key === "Enter") { pick(sel >= 0 ? sel : 0); return; }
+  else if (e.key === "Enter") {
+    const q = $("q").value.trim();
+    if (sel >= 0) pick(sel);
+    else if (info && info.fulltext && q) fulltext(q);
+    else pick(0);
+    return;
+  }
   else if (e.key === "Escape") { $("sug").style.display = "none"; return; }
   else return;
   links.forEach((l, i) => l.classList.toggle("on", i === sel)); e.preventDefault();

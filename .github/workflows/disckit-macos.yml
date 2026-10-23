@@ -1,0 +1,54 @@
+name: Build DiscKit.app (macOS)
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["disckit/**", ".github/workflows/disckit-macos.yml"]
+    tags: ["disckit-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build app and disk image
+        run: bash disckit/packaging/macos/build_app.sh
+
+      - name: Smoke test the app on a real Wikipedia file
+        run: |
+          APP=disckit/dist/DiscKit.app/Contents/MacOS/DiscKit
+          curl -sSL -o /tmp/ray.zim "$(curl -sSL https://download.kiwix.org/zim/wikipedia/ | grep -o 'wikipedia_en_ray-charles_maxi_[0-9-]*\.zim' | sort | tail -1 | sed 's#^#https://download.kiwix.org/zim/wikipedia/#')"
+          "$APP" build zim /tmp/ray.zim --text-out /tmp/disc/T --media-out /tmp/disc/M --label RAY
+          "$APP" verify /tmp/disc/T
+          "$APP" verify /tmp/disc/M
+          "$APP" read /tmp/disc/T /tmp/disc/M --no-browser --port 8899 &
+          sleep 3
+          curl -fsS http://127.0.0.1:8899/_disckit/ > /dev/null
+          curl -fsS "http://127.0.0.1:8899/_disckit/api/fulltext?q=piano" | grep -q '"available": true'
+          kill %1
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscKit-macOS-arm64
+          path: |
+            disckit/dist/*.dmg
+            disckit/dist/*.sha256
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/disckit-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            disckit/dist/*.dmg
+            disckit/dist/*.sha256

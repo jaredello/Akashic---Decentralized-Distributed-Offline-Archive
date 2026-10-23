@@ -9,7 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
-from ..rules import MEDIA, TEXT, Rules, guess_mime
+from ..rules import MEDIA, TEXT, Rules, base_mime, guess_mime
+from ..textindex import html_to_text, query_terms, snippet
 from ..volume import Volume
 
 SHELL = (Path(__file__).parent / "shell.html").read_text(encoding="utf-8")
@@ -31,6 +32,7 @@ class Library:
 
     def info(self):
         return {"title": self.title, "main_path": self.main_path, "set_mismatch": self.mismatch,
+                "fulltext": self.has_fulltext,
                 "volumes": [v.meta for v in self.volumes]}
 
     def _order(self, path):
@@ -61,6 +63,31 @@ class Library:
                     seen.add(path)
                     out.append({"path": path, "title": title})
         return out[:limit]
+
+    @property
+    def has_fulltext(self):
+        return any(v.has_fulltext for v in self.text)
+
+    def fulltext(self, q, page=0, per_page=15):
+        terms = query_terms(q)
+        out = {"query": q, "terms": terms, "available": self.has_fulltext, "page": page,
+               "total": 0, "results": []}
+        if not terms or not self.has_fulltext:
+            return out
+        for v in self.text:
+            total, rows = v.fulltext(terms, per_page, page * per_page)
+            out["total"] += total
+            for path, title in rows:
+                hit = self.find(path)
+                text = ""
+                if hit:
+                    mime, data = hit[0].read(path, hit[1])
+                    text = html_to_text(data) if base_mime(mime) == "text/html" else bytes(data).decode("utf-8", "replace")
+                    if title and text.startswith(title):
+                        text = text[len(title):].lstrip()
+                out["results"].append({"path": path, "title": title, "snippet": snippet(text, terms)})
+        out["more"] = len(out["results"]) == per_page
+        return out
 
     def random_path(self):
         for v in self.text:
@@ -125,6 +152,9 @@ def make_handler(lib):
                 return self._json({"volumes": [v.stats() for v in lib.volumes]})
             if name == "search":
                 return self._json(lib.search((q.get("q") or [""])[0]))
+            if name == "fulltext":
+                page = int((q.get("page") or ["0"])[0] or 0)
+                return self._json(lib.fulltext((q.get("q") or [""])[0], max(page, 0)))
             if name == "random":
                 return self._json({"path": lib.random_path()})
             self._send(404, b"{}", "application/json")

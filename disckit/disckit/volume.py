@@ -20,6 +20,8 @@ import zlib
 from collections import OrderedDict, deque
 from pathlib import Path
 
+from .textindex import FTS_SCHEMA, fts_query
+
 try:
     import zstandard as _zstd
 except ImportError:
@@ -84,7 +86,7 @@ def check_empty(root):
 
 class VolumeWriter:
     def __init__(self, root, role, set_id, label, capacity_bytes, compress=True,
-                 disc_index=1, disc_count=2):
+                 disc_index=1, disc_count=2, fulltext=False):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         check_empty(self.root)
@@ -95,6 +97,10 @@ class VolumeWriter:
         self.disc_index, self.disc_count = disc_index, disc_count
         self.db = sqlite3.connect(str(self.root / "index.db"))
         self.db.executescript("PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;" + SCHEMA)
+        self.fulltext = fulltext
+        self.fts_docs = 0
+        if fulltext:
+            self.db.executescript(FTS_SCHEMA)
         self.pack_no, self.pack_f, self.pack_pos = -1, None, 0
         self.packs_bytes = 0
         self.cluster, self.cluster_bytes = [], 0
@@ -173,6 +179,11 @@ class VolumeWriter:
             self.add_title(path, title)
         self._tick()
 
+    def add_fulltext(self, path, title, text):
+        cur = self.db.execute("INSERT INTO docs(path, title) VALUES (?,?)", (path, title))
+        self.db.execute("INSERT INTO fts(rowid, title, body) VALUES (?,?,?)", (cur.lastrowid, title, text))
+        self.fts_docs += 1
+
     def add_title(self, path, title):
         self.db.execute("INSERT INTO titles VALUES (?,?,?)", (path, title, title.casefold()))
 
@@ -180,6 +191,8 @@ class VolumeWriter:
         self._flush_cluster()
         self.pack_f.close()
         self.db.execute("CREATE INDEX IF NOT EXISTS titles_key ON titles(key)")
+        if self.fulltext:
+            self.db.execute("INSERT INTO fts(fts) VALUES('optimize')")
         self.db.commit()
         self.entries = self.db.execute("SELECT count(*) FROM entries").fetchone()[0]
         self.redirects = self.db.execute("SELECT count(*) FROM redirects").fetchone()[0]
@@ -188,7 +201,7 @@ class VolumeWriter:
             "format": FORMAT, "set_id": self.set_id, "role": self.role, "label": self.label,
             "disc_index": self.disc_index, "disc_count": self.disc_count,
             "entries": self.entries, "redirects": self.redirects, "raw_bytes": self.raw_bytes,
-            "packs": self.pack_no + 1, "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "packs": self.pack_no + 1, "fulltext": self.fulltext, "fulltext_docs": self.fts_docs, "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             **meta,
         }
         (self.root / "DISCKIT.json").write_text(json.dumps(info, indent=2))
@@ -250,6 +263,27 @@ class Volume:
         return self._db().execute(
             "SELECT path, title FROM titles WHERE key >= ? AND key < ? ORDER BY length(key) LIMIT ?",
             (key, key + "\uffff", limit)).fetchall()
+
+    @property
+    def has_fulltext(self):
+        return bool(self.meta.get("fulltext"))
+
+    def fulltext(self, terms, limit=20, offset=0):
+        """Best-ranked articles containing every term: (total_capped, [(path, title)])."""
+        q = fts_query(terms)
+        if not q or not self.has_fulltext:
+            return 0, []
+        db = self._db()
+        phrase = " ".join(terms)
+        rows = db.execute(
+            "SELECT d.path, d.title FROM (SELECT rowid, bm25(fts, 8.0, 1.0) AS r FROM fts WHERE fts MATCH ?) f "
+            "JOIN docs d ON d.id = f.rowid "
+            "ORDER BY lower(d.title) = ? DESC, f.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?) DESC, "
+            "f.r LIMIT ? OFFSET ?",
+            (q, phrase, "title : (" + q + ")", limit, offset)).fetchall()
+        total = db.execute("SELECT count(*) FROM (SELECT rowid FROM fts WHERE fts MATCH ? LIMIT 1000)",
+                           (q,)).fetchone()[0]
+        return total, rows
 
     def random_path(self):
         r = self._db().execute(

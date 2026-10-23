@@ -4,7 +4,10 @@ import threading
 import time
 import uuid
 
+import sqlite3
+
 from .rules import MEDIA, TEXT, Rules, base_mime
+from .textindex import FTS_SCHEMA, html_to_text
 from pathlib import Path
 
 from .volume import CLUSTER_TARGET, GB, DiscFullError, VolumeWriter, _compress, check_empty
@@ -33,7 +36,31 @@ class Progress:
             }
 
 
-def plan(source, rules, capacity_gb, sample_limit=400, cancel=None):
+FT_MIMES = ("text/html", "text/plain")
+
+
+def _ft_text(mime, data):
+    m = base_mime(mime)
+    if m == "text/html":
+        return html_to_text(data)
+    return bytes(data).decode("utf-8", "replace")
+
+
+def _fts_ratio(samples):
+    """Measure index bytes per raw HTML byte by indexing a real sample in memory."""
+    if not samples:
+        return 0.0
+    db = sqlite3.connect(":memory:")
+    db.executescript(FTS_SCHEMA)
+    for i, (mime, d) in enumerate(samples):
+        db.execute("INSERT INTO fts(rowid, title, body) VALUES (?,?,?)", (i + 1, "", _ft_text(mime, d)))
+    db.execute("INSERT INTO fts(fts) VALUES('optimize')")
+    db.commit()
+    size = db.execute("PRAGMA page_count").fetchone()[0] * db.execute("PRAGMA page_size").fetchone()[0]
+    return size / max(sum(len(d) for _, d in samples), 1)
+
+
+def plan(source, rules, capacity_gb, sample_limit=400, cancel=None, fulltext=True):
     """Scan the source (without writing) and estimate how full each disc will be."""
     if not source.estimable:
         return {"estimable": False, "note": "Websites are sized as they are crawled; build to see the totals."}
@@ -41,6 +68,7 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None):
     count = {TEXT: 0, MEDIA: 0}
     redirects = skipped = 0
     sample, sample_raw = [], 0
+    ft_sample, ft_raw = [], 0
     for it in source.items():
         if cancel and cancel.is_set():
             break
@@ -53,6 +81,10 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None):
             continue
         raw[role] += it.size
         count[role] += 1
+        if role == TEXT and fulltext and base_mime(it.mime) in FT_MIMES:
+            ft_raw += it.size
+            if len(ft_sample) < 200 and it.load:
+                ft_sample.append((it.mime, it.load()))
         if role == TEXT and rules.compressible(it.mime) and len(sample) < sample_limit and it.load:
             data = it.load()
             sample.append(data)
@@ -71,14 +103,15 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None):
             packed += len(_compress(b"".join(chunk))[1])
         ratio = packed / max(sample_raw, 1)
     index_overhead = (count[TEXT] + count[MEDIA] + redirects) * 120
-    est_text = raw[TEXT] * ratio + index_overhead * 0.7
+    fts_bytes = int(ft_raw * _fts_ratio(ft_sample)) if fulltext else 0
+    est_text = raw[TEXT] * ratio + index_overhead * 0.7 + fts_bytes
     est_media = raw[MEDIA] + index_overhead * 0.3
     cap = capacity_gb * GB
     return {
         "estimable": True, "capacity_bytes": cap,
         "text": {"items": count[TEXT], "raw_bytes": raw[TEXT], "est_bytes": int(est_text),
                  "fill_pct": est_text / cap * 100, "fits": est_text <= cap * 0.985,
-                 "compression_ratio": round(ratio, 3)},
+                 "compression_ratio": round(ratio, 3), "fulltext_bytes": fts_bytes},
         "media": {"items": count[MEDIA], "raw_bytes": raw[MEDIA], "est_bytes": int(est_media),
                   "fill_pct": est_media / cap * 100, "fits": est_media <= cap * 0.985},
         "redirects": redirects, "skipped": skipped,
@@ -86,7 +119,7 @@ def plan(source, rules, capacity_gb, sample_limit=400, cancel=None):
 
 
 def build(source, text_dir, media_dir, capacity_gb=100, rules=None, label="DISCKIT",
-          progress=None, log=print, cancel=None):
+          progress=None, log=print, cancel=None, fulltext=True):
     rules = rules or Rules()
     progress = progress or Progress()
     set_id = uuid.uuid4().hex
@@ -100,7 +133,8 @@ def build(source, text_dir, media_dir, capacity_gb=100, rules=None, label="DISCK
         raise ValueError("Disc folders can't be inside the source folder.")
     check_empty(t_path)
     check_empty(m_path)
-    tw = VolumeWriter(text_dir, TEXT, set_id, f"{label}_TEXT", cap, compress=True, disc_index=1)
+    tw = VolumeWriter(text_dir, TEXT, set_id, f"{label}_TEXT", cap, compress=True, disc_index=1,
+                      fulltext=fulltext)
     mw = VolumeWriter(media_dir, MEDIA, set_id, f"{label}_MEDIA", cap, compress=True, disc_index=2)
     with progress.lock:
         progress.phase, progress.total = "building", source.count_hint()
@@ -127,6 +161,8 @@ def build(source, text_dir, media_dir, capacity_gb=100, rules=None, label="DISCK
             data = it.load()
             if role == TEXT:
                 tw.add(it.path, it.mime, data, it.title, compressible=rules.compressible(it.mime))
+                if fulltext and base_mime(it.mime) in FT_MIMES:
+                    tw.add_fulltext(it.path, it.title or it.path, _ft_text(it.mime, data))
             else:
                 mw.add(it.path, it.mime, data, compressible=rules.compressible(it.mime))
                 if it.title:
