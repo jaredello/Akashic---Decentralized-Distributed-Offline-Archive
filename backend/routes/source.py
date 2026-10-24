@@ -20,7 +20,7 @@ router = APIRouter()
 TOP_LEVEL = ["README.md", "LICENSE", "CONTRIBUTING.md", "docs", "backend", "frontend", "disckit", ".github"]
 FRONTEND_ONLY = {"src", "public", "package.json", "craco.config.js", "tailwind.config.js",
                  "postcss.config.js", "jsconfig.json", "components.json"}
-HIDDEN_NAMES = {"node_modules", "build", "dist", "__pycache__", ".venv", ".pytest_cache", ".git",
+HIDDEN_NAMES = {"node_modules", "build", "dist", "__pycache__", ".venv", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".git",
                 "yarn.lock", "package-lock.json", ".DS_Store"}
 MAX_VIEW_BYTES = 600_000
 

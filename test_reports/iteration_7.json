@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the behaviour-preserving backend/frontend refactor, the new Source API, the Source page UI and the docs. Backend: the full regression suite plus a new test file give 91/91 passing. The new file is tests/test_source_and_refactor.py with 25 tests. The burn flow worked end to end: 209 articles and 615 images, both ISOs are valid ISO 9660 (CD001 present) and their sha256 values match /api/burn/checksums. Seed expand (target = count+2, theme=space) went 207 -> 209. POST /api/seed returns 'exists' and an invalid theme returns 400. All 14 path-traversal variants return 404 on both /source/file and /source/raw. The raw endpoint sends nosniff and CSP sandbox headers. The zip has no .env files and contains LICENSE, README.md and docs/ARCHITECTURE.md. Frontend: all Source page features work (README formatted view by default, Formatted/Code toggle, relative README link, folder expand/collapse, syntax highlighting with line numbers, summary, path, copy, raw, filter, license, zip download, stats, deep link, image view, .env error). The Burn page components after the split render with the same testids. Building, downloading, sha display, checksums and preview all work. Home, Article, Search and the Disk Monitor all work. One real bug was found and fixed: backend/.ruff_cache was listed in the source tree and included in the zip.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/source/tree, /api/source/download", "issue": "FIXED BY TESTER: backend/.ruff_cache (ruff cache files) was exposed in the tree and in the zip. Added .ruff_cache and .mypy_cache to HIDDEN_NAMES in routes/source.py. The tree now has 138 files instead of 142."},
+      {"endpoint": "POST /api/burn", "issue": "Slow but unchanged from before the refactor: reading the Media Disk goes about 2-4 images/s from object storage, one image at a time, so a full build of 615 images takes about 3-5 minutes. Optional improvement: read images in parallel with asyncio.gather and a semaphore."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Source FileHeader copy", "issue": "navigator.clipboard.writeText is not awaited or caught. When clipboard permission is denied, the 'File copied' success toast still shows and an unhandled promise rejection is thrown. Await the call, catch failures and show toast.error.", "selector": "[data-testid=source-copy-btn]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Source page (mobile 390px)", "issues": ["The Disk Monitor drawer is open by default and covers the Source page on mobile. This behaviour already existed across the app, but consider keeping it closed by default on small screens."]},
+      {"screen": "Burn > Grow the archive", "issues": ["The target slider defaults to 150 while the archive already has 209 articles, so clicking Grow at the default does nothing. Consider defaulting to the current count plus some extra. This behaviour existed before the refactor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_source_and_refactor.py", "/app/test_reports/pytest/pytest_results.xml", "/app/test_reports/pytest/pytest_iter7_burn.xml", "/app/test_reports/pytest/pytest_iter7_source.xml"],
+  "action_items": [
+    "Fix the Copy button in Source.js: await the clipboard write, catch the rejection and show an error toast when it fails",
+    "Optional: read Media Disk images in parallel during the burn to speed it up",
+    "Optional: default the grow-target slider to at least the current article count"
+  ],
+  "critical_code_review_comments": [
+    "routes/source.py: the allow-list plus resolve() parents check is solid. All traversal attempts, encoded variants, absolute paths, backslash paths, node_modules, memory/ and test_reports/ return 404.",
+    "Source.js: the file-loading effect does not cancel requests that are no longer needed. If you click files quickly, an older response can arrive last and overwrite the file you actually picked. Use an ignore flag or an AbortController.",
+    "CodeView Markdown: relative image src values inside markdown (e.g. ![](icon.png)) are not rewritten to /api/source/raw, so they would break. None of the current docs use them.",
+    "Prefix collision: the testid 'source-file-path' matches the 'source-file-<path>' prefix used by the tree. This only matters for test selectors.",
+    "The behaviour of disc_images.build_disc_images matches the old server.py (it reads the Media Disk one image at a time, as before)."
+  ],
+  "updated_files": ["/app/backend/routes/source.py", "/app/backend/tests/test_source_and_refactor.py"],
+  "success_rate": {"backend": "100%", "frontend": "98%"},
+  "seed_data_creation": "Grew the archive by 2 'space' articles (207 -> 209) and rebuilt the disc images (209 articles / 615 images).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend suite with REACT_APP_BACKEND_URL=<url> python -m pytest -q -n 0 tests/ (91 tests). The Burn test takes about 3 minutes, and it fails if the backend hot-reloads mid-build because the build runs as an in-memory asyncio task. Do not edit backend files while a burn is running. The archive now has 209 articles.",
+  "rca of the issue": ".ruff_cache exposure: HIDDEN_NAMES only listed .pytest_cache, .venv and .git among dot-folders, so the ruff linter's cache folder inside backend/ passed the allow-list. Fixed by adding it to HIDDEN_NAMES."
+}

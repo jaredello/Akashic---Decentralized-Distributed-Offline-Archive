@@ -113,3 +113,10 @@ Location: /app/disckit (downloadable zip via GET /api/kit/download, info at /api
 - Secrets (GitHub repo → Actions secrets): MACOS_CERT_P12_BASE64, MACOS_CERT_PASSWORD, ASC_API_KEY_P8_BASE64, ASC_API_KEY_ID, ASC_API_ISSUER_ID
 - Guide: packaging/macos/SIGNING.md; KitSection shows kit-signing-note; /api/kit/info app.signing_ready
 - Stub harness for signing logic: /root/signtest (t.sh + bin stubs)
+
+## Open source + readable code (Jun 2026) — DONE (iteration_7, 91/91 pytest)
+- Backend split (behaviour verified identical): config, media_storage, wikipedia_api, article_text, topics, archive_builder, disc_site, disc_images, routes/{articles,archive,burn,kit,source}; server.py only wires routers
+- Frontend: Burn.js split into components/burn/*; header comment on every file (shown as "What this file does")
+- Source page /source (anyone): tree + filter, highlight.js code with line numbers, formatted Markdown (marked + DOMPurify), raw, copy, license, zip download; API /api/source/{tree,file,raw,download} with allow-list (no .env/node_modules/caches/memory)
+- Open source: MIT LICENSE, root README, CONTRIBUTING, docs/ARCHITECTURE.md walkthrough, .github/ISSUE_TEMPLATE
+- Known pre-existing UX: Disk Monitor open by default on mobile; grow slider default 150

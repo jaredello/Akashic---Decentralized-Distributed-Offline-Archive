@@ -25,7 +25,14 @@ const findFolder = (nodes, path) => {
 };
 
 const FileHeader = ({ file, folderNote }) => {
-  const copy = () => { navigator.clipboard?.writeText(file.content || ""); toast.success("File copied"); };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(file.content || "");
+      toast.success("File copied");
+    } catch {
+      toast.error("Couldn't copy. Your browser blocked clipboard access.");
+    }
+  };
   return (
     <div className="mb-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
