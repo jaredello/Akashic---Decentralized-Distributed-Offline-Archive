@@ -1,3 +1,6 @@
+/**
+ * The "DiscKit for Mac" section on the Burn page: what the desktop app does and where to get it.
+ */
 import React, { useEffect, useState } from "react";
 import { Laptop, Download, FileArchive, FolderOpen, Globe, Disc3, BookOpen, Search, Github, Terminal } from "lucide-react";
 import { http, API, fmtBytes } from "@/lib/api";

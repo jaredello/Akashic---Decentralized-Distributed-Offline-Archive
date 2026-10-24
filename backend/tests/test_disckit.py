@@ -18,7 +18,7 @@ if not BASE_URL:
         for line in f:
             if line.startswith("REACT_APP_BACKEND_URL="):
                 BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
-ZIM = "/tmp/zim/knots.zim"
+ZIM = "/root/zim/knots.zim"
 WORK = "/tmp/disckit_pytest"
 
 
@@ -74,7 +74,7 @@ class Reader:
 class TestKitApi:
     def test_info(self):
         d = requests.get(f"{BASE_URL}/api/kit/info").json()
-        assert d["version"] == "1.0.0" and d["file_count"] > 0
+        assert d["version"] == "1.1.0" and d["file_count"] > 0
         assert d["sources"] == ["zim", "folder", "website"]
 
     def test_download_zip(self):
@@ -124,7 +124,7 @@ class TestZim:
 
     def test_existing_disc_folder_rejected(self, kit, zim_discs):
         r = _cli(kit, "build", "zim", ZIM, "--text-out", zim_discs[0], "--media-out", f"{WORK}/zim/M_new", check=False)
-        assert r.returncode != 0 and "already contains a disc" in r.stderr
+        assert r.returncode != 0 and "is not empty" in r.stderr
 
     def test_nonempty_folder_rejected(self, kit):
         junk = f"{WORK}/junk"; os.makedirs(junk, exist_ok=True)

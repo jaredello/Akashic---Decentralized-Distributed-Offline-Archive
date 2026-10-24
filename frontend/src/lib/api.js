@@ -1,3 +1,6 @@
+/**
+ * How the website talks to the backend: the base address, an HTTP client and a size formatter.
+ */
 import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;

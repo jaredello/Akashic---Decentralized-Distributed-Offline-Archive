@@ -1,3 +1,7 @@
+/**
+ * Article reader (/wiki/:slug): shows one article in Wikipedia's layout, reading its text from
+ * the Text Disc and its images from the Media Disc. Links to other archived articles stay in-app.
+ */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { FileText, WifiOff, Loader2, ArrowLeft } from "lucide-react";

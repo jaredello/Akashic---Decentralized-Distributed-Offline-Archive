@@ -1,3 +1,7 @@
+/**
+ * The closable Disk Monitor sidebar: live activity lights, read counts and fill levels for the
+ * Text Disc (drive 0) and Media Disc (drive 1).
+ */
 import React, { useEffect, useRef } from "react";
 import { Disc3, X, Cpu, Activity } from "lucide-react";
 import { useDisks } from "@/context/DiskContext";

@@ -1,3 +1,6 @@
+/**
+ * Title search with suggestions as you type (searches the Text Disc).
+ */
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";

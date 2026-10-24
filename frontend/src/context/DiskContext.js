@@ -1,3 +1,7 @@
+/**
+ * Shared disc state for the whole site: polls /api/disks/status and tracks which disc is being
+ * read right now, so the Disk Monitor and header lights can flicker realistically.
+ */
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { http } from "@/lib/api";
 

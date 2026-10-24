@@ -1,3 +1,6 @@
+/**
+ * An image loaded from the Media Disc. Lights up the Media Disc activity light while loading.
+ */
 import React, { useEffect, useState } from "react";
 import { mediaUrl, http } from "@/lib/api";
 import { useDisks } from "@/context/DiskContext";

@@ -1,6 +1,9 @@
+/**
+ * Top bar on every page: logo, search, and links to Source, Burn to Disc and the Disk Monitor.
+ */
 import React from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, HardDrive, WifiOff, Disc3 } from "lucide-react";
+import { BookOpen, HardDrive, WifiOff, Disc3, Code2 } from "lucide-react";
 import { SearchBox } from "@/components/SearchBox";
 import { useDisks } from "@/context/DiskContext";
 
@@ -31,6 +34,16 @@ export const Header = () => {
           <WifiOff size={13} className="text-[#54595d]" />
           OFFLINE · SERVED FROM DISC
         </div>
+
+        <Link
+          to="/source"
+          data-testid="source-link"
+          className="hidden sm:flex items-center gap-2 px-3 h-9 rounded-sm border border-[#a2a9b1] bg-white text-[#202122] text-xs font-semibold hover:bg-[#f8f9fa] transition-colors"
+          title="Read the app's open-source code"
+        >
+          <Code2 size={15} className="text-[#3366cc]" />
+          <span className="mono">SOURCE</span>
+        </Link>
 
         <Link
           to="/burn"

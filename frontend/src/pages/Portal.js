@@ -1,3 +1,7 @@
+/**
+ * Home page: the Wikipedia-style main page with a grid of every archived article.
+ * On first visit it asks the backend to download the starter articles.
+ */
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Disc3, FileText, Image as ImageIcon, WifiOff, ChevronRight, Loader2 } from "lucide-react";
